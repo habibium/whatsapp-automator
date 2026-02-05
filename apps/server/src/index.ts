@@ -13,11 +13,26 @@ import { whatsappService } from "./services/whatsapp.js";
 
 const app = new Hono();
 
-// CORS for development
+// CORS configuration
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://192.168.0.18:5173",
+  "http://192.168.0.18:3000"
+];
+
 app.use(
   "/api/*",
   cors({
-    origin: ["http://localhost:5173", "http://localhost:3000"],
+    origin: (origin) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return allowedOrigins[0];
+      // Check if origin is in allowed list or is a local network IP
+      if (allowedOrigins.includes(origin) || /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)) {
+        return origin;
+      }
+      return allowedOrigins[0];
+    },
     credentials: true
   })
 );

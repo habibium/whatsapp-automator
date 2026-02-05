@@ -1,4 +1,5 @@
-const API_BASE = "/api";
+// Use env variable if set, otherwise use relative URL (works with Vite proxy in dev)
+const API_BASE = import.meta.env["VITE_API_URL"] || "/api";
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
 

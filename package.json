@@ -10,9 +10,10 @@
   "scripts": {
     "dev": "bun --filter '@app/server' dev",
     "dev:web": "bun --filter '@app/web' dev",
-    "build": "bun --filter '*' build",
-    "build:server": "bun --filter '@app/server' build",
+    "build": "bun --filter '@pkg/*' build && bun --filter '@app/*' build",
+    "build:server": "bun --filter '@pkg/shared' build && bun --filter '@app/server' build",
     "build:web": "bun --filter '@app/web' build",
+    "start": "bun --filter '*' start",
     "db:generate": "bun --filter '@app/server' db:generate",
     "db:migrate": "bun --filter '@app/server' db:migrate",
     "biome": "biome check"

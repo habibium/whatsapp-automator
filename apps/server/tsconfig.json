@@ -7,6 +7,5 @@
     "jsxImportSource": "hono/jsx",
     "types": ["node"]
   },
-  "include": ["src"],
-  "references": [{ "path": "../../packages/shared" }]
+  "include": ["src"]
 }
