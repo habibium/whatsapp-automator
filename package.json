@@ -3,22 +3,22 @@
   "private": true,
   "type": "module",
   "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "pnpm --filter @app/server dev",
-    "dev:web": "pnpm --filter @app/web dev",
-    "build": "pnpm -r build",
-    "build:server": "pnpm --filter @app/server build",
-    "build:web": "pnpm --filter @app/web build",
-    "db:generate": "pnpm --filter @app/server db:generate",
-    "db:migrate": "pnpm --filter @app/server db:migrate",
+    "dev": "bun --filter '@app/server' dev",
+    "dev:web": "bun --filter '@app/web' dev",
+    "build": "bun --filter '*' build",
+    "build:server": "bun --filter '@app/server' build",
+    "build:web": "bun --filter '@app/web' build",
+    "db:generate": "bun --filter '@app/server' db:generate",
+    "db:migrate": "bun --filter '@app/server' db:migrate",
     "biome": "biome check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.10",
     "typescript": "^5.9.3"
-  },
-  "engines": {
-    "node": ">=24"
-  },
-  "packageManager": "pnpm@10.26.1"
+  }
 }

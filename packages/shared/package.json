@@ -2,12 +2,24 @@
   "name": "@pkg/shared",
   "version": "0.0.1",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./logger": "./dist/logger.js",
-    "./types": "./dist/types.js"
+    ".": {
+      "types": "./src/index.ts",
+      "bun": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./logger": {
+      "types": "./src/logger.ts",
+      "bun": "./src/logger.ts",
+      "import": "./src/logger.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "bun": "./src/types.ts",
+      "import": "./src/types.ts"
+    }
   },
   "scripts": {
     "build": "tsc",
