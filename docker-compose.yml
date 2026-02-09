@@ -1,0 +1,51 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: whatsapp-scheduler-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-whatsapp_scheduler}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-whatsapp_scheduler}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WhatsApp Scheduler Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-scheduler-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-whatsapp_scheduler}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      # Persist WhatsApp session data
+      - whatsapp_session:/app/apps/server/whatsapp-session
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    name: whatsapp-scheduler-postgres-data
+  whatsapp_session:
+    name: whatsapp-scheduler-session

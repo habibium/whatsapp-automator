@@ -14,12 +14,16 @@ import { whatsappService } from "./services/whatsapp.js";
 const app = new Hono();
 
 // CORS configuration
-const allowedOrigins = [
+const defaultOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "http://192.168.0.18:5173",
   "http://192.168.0.18:3000"
 ];
+
+// Allow additional origins via environment variable (comma-separated)
+const envOrigins = process.env["CORS_ORIGINS"]?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
+const allowedOrigins = [...defaultOrigins, ...envOrigins];
 
 app.use(
   "/api/*",
