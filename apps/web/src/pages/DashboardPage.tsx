@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { describeCron } from "../components/CronScheduleBuilder";
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -168,7 +169,9 @@ export function DashboardPage() {
                     )}
                     <div>
                       <p className="text-sm font-medium">{msg.target}</p>
-                      <code className="text-xs text-muted-foreground">{msg.cronExpression}</code>
+                      <p className="text-xs text-muted-foreground">
+                        {describeCron(msg.cronExpression)}
+                      </p>
                     </div>
                   </div>
                   <Badge variant={msg.enabled ? "default" : "secondary"}>

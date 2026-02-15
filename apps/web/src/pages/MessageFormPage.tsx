@@ -1,29 +1,18 @@
-import { ArrowLeft, Clock, Loader2, Save, User, Users } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { ArrowLeft, Loader2, MessageSquareText, Save, Send, User, Users } from "lucide-react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { CronScheduleBuilder } from "../components/CronScheduleBuilder";
+import { GroupCombobox } from "../components/GroupCombobox";
+import { TemplateVariableChips } from "../components/TemplateVariableChips";
 import { Alert, AlertDescription } from "../components/ui/alert";
-import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Separator } from "../components/ui/separator";
 import { Switch } from "../components/ui/switch";
 import { Textarea } from "../components/ui/textarea";
 import { useMessage, useMessages } from "../hooks/useMessages";
 import { api, type WhatsAppGroup } from "../lib/api";
-
-const CRON_PRESETS = [
-  { label: "Every minute", value: "* * * * *" },
-  { label: "Every 5 min", value: "*/5 * * * *" },
-  { label: "Every hour", value: "0 * * * *" },
-  { label: "Daily 9 AM", value: "0 9 * * *" },
-  { label: "Daily 6 PM", value: "0 18 * * *" },
-  { label: "Monday 9 AM", value: "0 9 * * 1" },
-  { label: "Weekdays 9 AM", value: "0 9 * * 1-5" },
-  { label: "Monthly 1st", value: "0 9 1 * *" }
-];
 
 export function MessageFormPage() {
   const { id } = useParams();
@@ -41,6 +30,7 @@ export function MessageFormPage() {
   const [groups, setGroups] = useState<WhatsAppGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isEditing = Boolean(id);
 
   useEffect(() => {
@@ -64,6 +54,28 @@ export function MessageFormPage() {
       });
     }
   }, [isGroup, groups.length]);
+
+  const handleInsertVariable = useCallback((variable: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setMessageText((prev) => prev + variable);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+
+    setMessageText(before + variable + after);
+
+    // Restore cursor position after the inserted variable
+    requestAnimationFrame(() => {
+      const newPos = start + variable.length;
+      textarea.focus();
+      textarea.setSelectionRange(newPos, newPos);
+    });
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -102,16 +114,22 @@ export function MessageFormPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/messages")}>
+    <div className="mx-auto max-w-2xl pb-8">
+      {/* Header */}
+      <div className="mb-8 flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/messages")}
+          className="shrink-0"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight">
             {isEditing ? "Edit Message" : "New Scheduled Message"}
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {isEditing
               ? "Update your scheduled message settings"
               : "Set up a new automated WhatsApp message"}
@@ -119,7 +137,7 @@ export function MessageFormPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error ? (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -128,8 +146,11 @@ export function MessageFormPage() {
 
         {/* Recipient */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recipient</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Send className="h-4 w-4 text-muted-foreground" />
+              Recipient
+            </CardTitle>
             <CardDescription>Choose who will receive this message</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -140,7 +161,10 @@ export function MessageFormPage() {
                   type="button"
                   variant={!isGroup ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setIsGroup(false)}
+                  onClick={() => {
+                    setIsGroup(false);
+                    setTarget("");
+                  }}
                   className="flex-1"
                 >
                   <User className="mr-2 h-4 w-4" />
@@ -150,7 +174,10 @@ export function MessageFormPage() {
                   type="button"
                   variant={isGroup ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setIsGroup(true)}
+                  onClick={() => {
+                    setIsGroup(true);
+                    setTarget("");
+                  }}
                   className="flex-1"
                 >
                   <Users className="mr-2 h-4 w-4" />
@@ -161,108 +188,86 @@ export function MessageFormPage() {
 
             <div className="space-y-2">
               <Label htmlFor="target">{isGroup ? "Group Name" : "Phone Number"}</Label>
-              <Input
-                id="target"
-                type={isGroup ? "text" : "tel"}
-                placeholder={isGroup ? "Enter group name exactly as it appears" : "+1234567890"}
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                required
-              />
+              {isGroup ? (
+                <GroupCombobox
+                  value={target}
+                  onChange={setTarget}
+                  groups={groups}
+                  loading={loadingGroups}
+                />
+              ) : (
+                <Input
+                  id="target"
+                  type="tel"
+                  placeholder="+1234567890"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                  required
+                />
+              )}
               <p className="text-xs text-muted-foreground">
                 {isGroup
-                  ? "Enter the exact group name (case-insensitive)"
+                  ? "Search from your groups or type a custom group name"
                   : "Include country code without spaces or dashes"}
               </p>
-
-              {isGroup && groups.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {loadingGroups ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {groups.slice(0, 8).map((g) => (
-                    <Badge
-                      key={g.id}
-                      variant={target === g.name ? "default" : "secondary"}
-                      className="cursor-pointer"
-                      onClick={() => setTarget(g.name)}
-                    >
-                      {g.name}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
             </div>
           </CardContent>
         </Card>
 
         {/* Message */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Message</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+              Message
+            </CardTitle>
             <CardDescription>Write the content that will be sent</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <Label htmlFor="message">Content</Label>
-            <Textarea
-              id="message"
-              placeholder="Type your message here..."
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              required
-              rows={5}
-              className="resize-y"
-            />
-            <p className="text-xs text-muted-foreground">{messageText.length} characters</p>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="message">Content</Label>
+              <Textarea
+                ref={textareaRef}
+                id="message"
+                placeholder="Type your message here..."
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                required
+                rows={5}
+                className="resize-y font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">{messageText.length} characters</p>
+            </div>
+            <TemplateVariableChips onInsert={handleInsertVariable} />
           </CardContent>
         </Card>
 
         {/* Schedule */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Schedule</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <svg
+                className="h-4 w-4 text-muted-foreground"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                role="img"
+                aria-label="Schedule"
+              >
+                <title>Schedule</title>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Schedule
+            </CardTitle>
             <CardDescription>Define when this message should be sent</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cron">Cron Expression</Label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="cron"
-                  type="text"
-                  className="pl-9 font-mono"
-                  placeholder="* * * * *"
-                  value={cronExpression}
-                  onChange={(e) => setCronExpression(e.target.value)}
-                  required
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Format: minute hour day-of-month month day-of-week
-              </p>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Quick presets</Label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {CRON_PRESETS.map((preset) => (
-                  <Button
-                    key={preset.value}
-                    type="button"
-                    variant={cronExpression === preset.value ? "default" : "outline"}
-                    size="sm"
-                    className={cn(
-                      "h-auto whitespace-normal py-2 text-xs",
-                      cronExpression === preset.value && "ring-2 ring-primary/20"
-                    )}
-                    onClick={() => setCronExpression(preset.value)}
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
+          <CardContent>
+            <CronScheduleBuilder value={cronExpression} onChange={setCronExpression} />
           </CardContent>
         </Card>
 
@@ -280,7 +285,7 @@ export function MessageFormPage() {
         </Card>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 pt-1">
           <Button type="button" variant="outline" onClick={() => navigate("/messages")}>
             Cancel
           </Button>

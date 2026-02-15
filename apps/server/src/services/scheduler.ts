@@ -2,6 +2,7 @@ import { logger } from "@pkg/shared";
 import cron, { type ScheduledTask } from "node-cron";
 import { getAllEnabledScheduledMessages, getScheduledMessages } from "../db/queries.js";
 import type { ScheduledMessageRow } from "../db/schema.js";
+import { processTemplate } from "./template.js";
 import { whatsappService } from "./whatsapp.js";
 
 type ScheduledJob = {
@@ -72,7 +73,12 @@ class SchedulerService {
         );
 
         if (chatId) {
-          const sent = await whatsappService.sendMessage(message.userId, chatId, message.message);
+          const processedMessage = await processTemplate(message.message, message.userId);
+          logger.debug(
+            { messageId: message.id, original: message.message, processed: processedMessage },
+            "Processed template variables"
+          );
+          const sent = await whatsappService.sendMessage(message.userId, chatId, processedMessage);
           if (!sent) {
             logger.warn({ messageId: message.id }, "Failed to send scheduled message");
           }

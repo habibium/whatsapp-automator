@@ -1,6 +1,7 @@
 import { Inbox, Loader2, Pencil, Plus, Trash2, User, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { describeCron } from "../components/CronScheduleBuilder";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import {
@@ -100,13 +101,20 @@ export function MessagesPage() {
                       <span className="font-medium">{msg.target}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="max-w-[200px]">
+                  <TableCell className="max-w-50">
                     <span className="line-clamp-1 text-muted-foreground">{msg.message}</span>
                   </TableCell>
                   <TableCell>
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                      {msg.cronExpression}
-                    </code>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default text-sm text-foreground">
+                          {describeCron(msg.cronExpression)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <code className="font-mono text-xs">{msg.cronExpression}</code>
+                      </TooltipContent>
+                    </Tooltip>
                   </TableCell>
                   <TableCell className="text-center">
                     <Tooltip>

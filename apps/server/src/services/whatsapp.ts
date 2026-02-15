@@ -187,6 +187,20 @@ class WhatsAppService {
     return `${cleanNumber}@s.whatsapp.net`;
   }
 
+  getPhoneNumber(userId: string): string | null {
+    const conn = this.connections.get(userId);
+    if (!conn?.socket) return null;
+    try {
+      const jid = conn.socket.user?.id;
+      if (!jid) return null;
+      // JID format: 1234567890:12@s.whatsapp.net — extract the number
+      const num = jid.split("@")[0]?.split(":")[0];
+      return num ? `+${num}` : null;
+    } catch {
+      return null;
+    }
+  }
+
   private async createAuthState(userId: string): Promise<{
     state: AuthenticationState;
     saveCreds: () => Promise<void>;
