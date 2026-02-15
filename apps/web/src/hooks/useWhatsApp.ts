@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type WhatsAppStatus } from "../lib/api";
+import { api, buildApiUrl, type WhatsAppStatus } from "../lib/api";
 
 type QREvent =
   | { type: "qr"; data: string }
@@ -34,7 +34,9 @@ export function useWhatsApp() {
     setQrCode(null);
 
     // Start SSE stream for QR
-    const eventSource = new EventSource("/api/whatsapp/qr", { withCredentials: true });
+    const eventSource = new EventSource(buildApiUrl("/whatsapp/qr"), {
+      withCredentials: true
+    });
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {

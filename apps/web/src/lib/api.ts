@@ -1,10 +1,14 @@
 // Use env variable if set, otherwise use relative URL (works with Vite proxy in dev)
 const API_BASE = import.meta.env["VITE_API_URL"] || "/api";
 
+export function buildApiUrl(endpoint: string): string {
+  return `${API_BASE}${endpoint}`;
+}
+
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetch(buildApiUrl(endpoint), {
     ...options,
     credentials: "include",
     headers: {

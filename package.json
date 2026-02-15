@@ -8,7 +8,6 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun --filter '@app/server' dev",
     "dev:server": "bun --filter '@app/server' dev",
     "dev:web": "bun --filter '@app/web' dev",
     "build": "bun --filter '@pkg/*' build && bun --filter '@app/*' build",
