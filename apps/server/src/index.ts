@@ -22,7 +22,11 @@ const defaultOrigins = [
 ];
 
 // Allow additional origins via environment variable (comma-separated)
-const envOrigins = process.env["CORS_ORIGINS"]?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
+const envOrigins =
+  process.env["CORS_ORIGINS"]
+    ?.split(",")
+    .map((o) => o.trim())
+    .filter(Boolean) ?? [];
 const allowedOrigins = [...defaultOrigins, ...envOrigins];
 
 app.use(
