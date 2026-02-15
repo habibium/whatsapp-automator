@@ -10,7 +10,8 @@ The project is split into:
 
 ## Tech stack
 
-- **Runtime/Tooling**: Node.js \(\>= 24\), TypeScript, pnpm workspaces
+- **Runtime**: Node.js \(\>= 24\)
+- **Package/Workspace tooling**: Bun \(\>= 1.0\) workspaces
 - **Backend**: Hono, `@hono/node-server`, Drizzle ORM + Postgres, `node-cron`, Baileys, `@node-rs/argon2`, Pino
 - **Frontend**: React, React Router, Vite
 
@@ -89,7 +90,8 @@ This runs:
 
 ### 1. Prerequisites
 
-- **Bun** \(\>= 1.0\) or **Node.js** \(\>= 24\)
+- **Bun** \(\>= 1.0\) for package/workspace management
+- **Node.js** \(\>= 24\) for runtime execution
 - **Postgres** running locally or accessible via `DATABASE_URL`
 
 ### 2. Install dependencies
@@ -126,6 +128,8 @@ bun run db:migrate
 Make sure your Postgres instance is running and matches the `DATABASE_URL`.
 
 ## Running the apps locally
+
+> Runtime note: Bun is used to install dependencies and orchestrate workspace scripts; application/runtime execution uses Node.
 
 ### Backend server (API)
 
@@ -178,7 +182,7 @@ Key web folders:
 
 ## Scripts (root)
 
-- `bun run dev` – Start the backend server (`apps/server`)
+- `bun run dev` – Start the Docker development stack (`docker-compose.dev.yml`)
 - `bun run dev:web` – Start the web dashboard (`apps/web`)
 - `bun run build` – Build all workspaces
 - `bun run build:server` – Build the server only
@@ -191,7 +195,7 @@ Key web folders:
 
 - Keep database changes in sync with `drizzle` migrations in `apps/server`.
 - Shared logic (types, logging, etc.) should live in `packages/shared` so both apps can consume it.
-- Run `pnpm biome` before committing to keep the codebase consistent.
+- Run `bun run biome` before committing to keep the codebase consistent.
 
 ## License
 
