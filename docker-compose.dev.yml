@@ -1,5 +1,5 @@
 # Development docker-compose with hot reloading
-# Usage: docker compose -f docker-compose.dev.yml up
+# Usage: docker compose --env-file .env.dev -f docker-compose.dev.yml up
 
 services:
   # PostgreSQL Database
@@ -38,8 +38,8 @@ services:
       - server_node_modules:/app/node_modules
       - whatsapp_session_dev:/app/apps/server/whatsapp-session
     ports:
-      - "3000:3000"
-    command: sh -c "apk add --no-cache python3 make g++ linux-headers && bun install && bun run dev"
+      - "${APP_PORT:-3000}:3000"
+    command: sh -c "bun install && bun --filter '@app/server' db:migrate && bun --filter '@app/server' dev"
 
   # Web frontend with hot reload
   web:
@@ -47,12 +47,13 @@ services:
     container_name: whatsapp-scheduler-web-dev
     working_dir: /app
     environment:
-      VITE_API_URL: http://localhost:3000/api
+      VITE_API_URL: ${VITE_API_URL:-/api}
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://server:3000}
     volumes:
       - .:/app
       - web_node_modules:/app/node_modules
     ports:
-      - "5173:5173"
+      - "${WEB_PORT:-5173}:5173"
     command: sh -c "bun install && bun run dev:web"
 
 volumes:

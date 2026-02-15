@@ -73,13 +73,15 @@ docker compose exec app sh -c "cd /app/apps/server && bun run db:migrate"
 For development with hot reloading:
 
 ```bash
-docker compose -f docker-compose.dev.yml up
+bun run dev
 ```
+
+This command uses `.env.dev` by default.
 
 This runs:
 - PostgreSQL on port 5432
 - Server (with hot reload) on port 3000
-- Web frontend (with hot reload) on port 5173
+- Web frontend (with hot reload) on port 5174
 
 ---
 
@@ -130,7 +132,7 @@ Make sure your Postgres instance is running and matches the `DATABASE_URL`.
 From the root:
 
 ```bash
-bun run dev
+bun run dev:local
 ```
 
 This starts the server defined in `apps/server`. It exposes HTTP routes for:

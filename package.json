@@ -8,7 +8,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun --filter '@app/server' dev",
+    "dev": "docker compose --env-file .env.dev -f docker-compose.dev.yml up --build",
+    "dev:local": "bun --filter '@app/server' dev",
     "dev:web": "bun --filter '@app/web' dev",
     "build": "bun --filter '@pkg/*' build && bun --filter '@app/*' build",
     "build:server": "bun --filter '@pkg/shared' build && bun --filter '@app/server' build",
