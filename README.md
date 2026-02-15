@@ -1,202 +1,73 @@
 # Whatsapp Message Scheduler
 
-WhatsApp Message Scheduler is a small monorepo that lets you schedule WhatsApp messages through a backend service with a React-based dashboard.
+WhatsApp Message Scheduler is a Bun workspace monorepo for scheduling WhatsApp messages through a backend API and a React dashboard.
 
-The project is split into:
+## Monorepo layout
 
-- `apps/server` – Hono-based HTTP API using Drizzle ORM, Postgres, `node-cron`, and Baileys for WhatsApp connectivity.
-- `apps/web` – React + Vite frontend dashboard for authentication, connecting WhatsApp, and managing scheduled messages.
-- `packages/shared` – Shared types and utilities used by both the server and the web app.
+- `apps/server` – Hono API, Drizzle ORM, PostgreSQL, scheduler, WhatsApp integration
+- `apps/web` – React + Vite dashboard
+- `packages/shared` – shared types/utilities
 
-## Tech stack
+## Requirements
 
-- **Runtime**: Node.js \(\>= 24\)
-- **Package/Workspace tooling**: Bun \(\>= 1.0\) workspaces
-- **Backend**: Hono, `@hono/node-server`, Drizzle ORM + Postgres, `node-cron`, Baileys, `@node-rs/argon2`, Pino
-- **Frontend**: React, React Router, Vite
+- Bun (for dependency + workspace management)
+- Node.js >= 24 (server runtime/build tooling)
+- Local PostgreSQL instance
 
-## Getting started
+## Setup
 
-You can run this project either with **Docker** (recommended for production) or **locally** for development.
-
----
-
-## Option 1: Docker (Recommended)
-
-### Prerequisites
-
-- **Docker** and **Docker Compose** installed
-
-### Quick Start
-
-1. **Clone and configure**:
-
-```bash
-cp .env.example .env
-# Edit .env to set POSTGRES_PASSWORD for production
-```
-
-2. **Build and run**:
-
-```bash
-docker compose up -d
-```
-
-3. **Run database migrations**:
-
-```bash
-docker compose exec app sh -c "cd /app/apps/server && bun run db:migrate"
-```
-
-4. **Access the application** at `http://localhost:3000`
-
-### Docker Commands
-
-```bash
-# Start all services
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
-
-# Rebuild after code changes
-docker compose up -d --build
-
-# Run migrations
-docker compose exec app sh -c "cd /app/apps/server && bun run db:migrate"
-```
-
-### Development with Docker
-
-For development with hot reloading:
-
-```bash
-bun run dev
-```
-
-This command uses `.env.dev` by default.
-
-This runs:
-- PostgreSQL on port 5432
-- Server (with hot reload) on port 3000
-- Web frontend (with hot reload) on port 5174
-
----
-
-## Option 2: Local Development
-
-### 1. Prerequisites
-
-- **Bun** \(\>= 1.0\) for package/workspace management
-- **Node.js** \(\>= 24\) for runtime execution
-- **Postgres** running locally or accessible via `DATABASE_URL`
-
-### 2. Install dependencies
-
-From the repository root:
+1. Install dependencies:
 
 ```bash
 bun install
 ```
 
-### 3. Configure environment
-
-Copy `.env.example` and adjust as needed:
+2. Configure environment:
 
 ```bash
 cp .env.example .env
 ```
 
-The main variable is:
+3. Ensure your `DATABASE_URL` points to local Postgres, for example:
 
-- `DATABASE_URL` – Postgres connection string \(e.g. `postgresql://postgres:postgres@127.0.0.1/whatsapp_scheduler`\)
+```dotenv
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1/whatsapp_scheduler"
+```
 
-Depending on how you extend the project, you may add more environment variables (e.g. auth secrets, WhatsApp-related settings) to your `.env`.
-
-### 4. Set up the database
-
-Generate & run migrations from the root (delegated to `apps/server`):
+4. Run migrations:
 
 ```bash
 bun run db:generate
 bun run db:migrate
 ```
 
-Make sure your Postgres instance is running and matches the `DATABASE_URL`.
+## Run locally
 
-## Running the apps locally
-
-> Runtime note: Bun is used to install dependencies and orchestrate workspace scripts; application/runtime execution uses Node.
-
-### Backend server (API)
-
-From the root:
+Run each app in its own terminal:
 
 ```bash
-bun run dev:local
-```
+# API server
+bun run dev:server
 
-This starts the server defined in `apps/server`. It exposes HTTP routes for:
-
-- authentication
-- WhatsApp session handling
-- scheduling and managing messages
-
-### Web dashboard
-
-In a separate terminal, from the root:
-
-```bash
+# Web app
 bun run dev:web
 ```
 
-This runs the Vite dev server for the React app in `apps/web`. Open the printed URL in your browser (often `http://localhost:5173`) to access the dashboard.
+- API: `http://localhost:3000`
+- Web: `http://localhost:5173`
 
-## Project structure
+## Root scripts
 
-High-level layout:
-
-```text
-apps/
-  server/   # Hono + Drizzle + Postgres API
-  web/      # React + Vite dashboard
-packages/
-  shared/   # Shared types and utilities
-```
-
-Key server folders:
-
-- `src/db` – Drizzle ORM schema and query helpers
-- `src/routes` – API routes (auth, messages, WhatsApp)
-- `src/services` – Scheduling and WhatsApp integration logic
-
-Key web folders:
-
-- `src/pages` – Top-level pages (login, register, dashboard, message form/list, connect page)
-- `src/components` – Layout, footer, protected route wrapper, etc.
-- `src/hooks` – Custom hooks for auth, messages, and WhatsApp interactions
-- `src/lib/api.ts` – API client helpers
-
-## Scripts (root)
-
-- `bun run dev` – Start the Docker development stack (`docker-compose.dev.yml`)
-- `bun run dev:web` – Start the web dashboard (`apps/web`)
+- `bun run dev` – Start server dev mode
+- `bun run dev:server` – Start server dev mode
+- `bun run dev:web` – Start web dev mode
 - `bun run build` – Build all workspaces
-- `bun run build:server` – Build the server only
-- `bun run build:web` – Build the web app only
+- `bun run build:server` – Build shared + server
+- `bun run build:web` – Build web app
 - `bun run db:generate` – Generate Drizzle migrations
-- `bun run db:migrate` – Run database migrations
+- `bun run db:migrate` – Run Drizzle migrations
 - `bun run biome` – Run Biome checks
-
-## Contributing / Development notes
-
-- Keep database changes in sync with `drizzle` migrations in `apps/server`.
-- Shared logic (types, logging, etc.) should live in `packages/shared` so both apps can consume it.
-- Run `bun run biome` before committing to keep the codebase consistent.
 
 ## License
 
-This project is licensed under the terms described in `LICENSE`.
+See `LICENSE`.

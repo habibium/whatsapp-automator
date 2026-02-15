@@ -8,11 +8,19 @@ import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
-const NAV_ITEMS = [
+type NavItem = {
+  to: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  end?: boolean;
+  showStatus?: boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard", end: true },
   { to: "/connect", icon: Link2, label: "Connection", showStatus: true },
   { to: "/messages", icon: MessageSquareText, label: "Messages" }
-] as const;
+];
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -45,7 +53,7 @@ export function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
+              {...(item.end !== undefined ? { end: item.end } : {})}
               className={({ isActive }: { isActive: boolean }) =>
                 cn(
                   "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",

@@ -90,6 +90,7 @@ app.get("*", async (c) => {
 async function main() {
   // Test database connection
   const dbConnected = await testConnection();
+  logger.info(`URL: ${process.env["DATABASE_URL"]}`);
   if (!dbConnected) {
     logger.error("Failed to connect to database. Exiting.");
     process.exit(1);
