@@ -1,5 +1,5 @@
 import { CalendarClock, Loader2 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type SubmitEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Footer } from "../components/Footer";
 import { Alert, AlertDescription } from "../components/ui/alert";
@@ -24,7 +24,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
