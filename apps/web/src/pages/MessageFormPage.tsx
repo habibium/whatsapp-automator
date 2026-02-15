@@ -1,18 +1,28 @@
+import { ArrowLeft, Clock, Loader2, Save, User, Users } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Separator } from "../components/ui/separator";
+import { Switch } from "../components/ui/switch";
+import { Textarea } from "../components/ui/textarea";
 import { useMessage, useMessages } from "../hooks/useMessages";
 import { api, type WhatsAppGroup } from "../lib/api";
-import "./MessageFormPage.css";
 
 const CRON_PRESETS = [
   { label: "Every minute", value: "* * * * *" },
-  { label: "Every 5 minutes", value: "*/5 * * * *" },
+  { label: "Every 5 min", value: "*/5 * * * *" },
   { label: "Every hour", value: "0 * * * *" },
-  { label: "Every day at 9 AM", value: "0 9 * * *" },
-  { label: "Every day at 6 PM", value: "0 18 * * *" },
-  { label: "Every Monday at 9 AM", value: "0 9 * * 1" },
-  { label: "Every weekday at 9 AM", value: "0 9 * * 1-5" },
-  { label: "First of every month", value: "0 9 1 * *" }
+  { label: "Daily 9 AM", value: "0 9 * * *" },
+  { label: "Daily 6 PM", value: "0 18 * * *" },
+  { label: "Monday 9 AM", value: "0 9 * * 1" },
+  { label: "Weekdays 9 AM", value: "0 9 * * 1-5" },
+  { label: "Monthly 1st", value: "0 9 1 * *" }
 ];
 
 export function MessageFormPage() {
@@ -33,7 +43,6 @@ export function MessageFormPage() {
 
   const isEditing = Boolean(id);
 
-  // Load existing message if editing
   useEffect(() => {
     if (message) {
       setTarget(message.target);
@@ -44,7 +53,6 @@ export function MessageFormPage() {
     }
   }, [message]);
 
-  // Fetch groups when isGroup is true
   useEffect(() => {
     if (isGroup && groups.length === 0) {
       setLoadingGroups(true);
@@ -85,190 +93,205 @@ export function MessageFormPage() {
     }
   };
 
-  const handlePreset = (value: string) => {
-    setCronExpression(value);
-  };
-
   if (loadingMessage && isEditing) {
     return (
-      <div className="form-page">
-        <div className="form-loading">
-          <div className="spinner spinner-lg" />
-        </div>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="form-page animate-fade-in">
-      <header className="page-header">
-        <h1 className="page-title">{isEditing ? "Edit Message" : "New Scheduled Message"}</h1>
-        <p className="page-subtitle">
-          {isEditing
-            ? "Update your scheduled message settings"
-            : "Set up a new automated WhatsApp message"}
-        </p>
-      </header>
+    <div className="mx-auto max-w-2xl space-y-8">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/messages")}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isEditing ? "Edit Message" : "New Scheduled Message"}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            {isEditing
+              ? "Update your scheduled message settings"
+              : "Set up a new automated WhatsApp message"}
+          </p>
+        </div>
+      </div>
 
-      <form className="message-form" onSubmit={handleSubmit}>
-        {error && <div className="form-error-banner">{error}</div>}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
 
-        <div className="form-section">
-          <h2 className="section-title">Recipient</h2>
-
-          <div className="form-row">
-            <fieldset className="form-group type-fieldset">
-              <legend className="form-label">Type</legend>
-              <div className="type-toggle">
-                <button
+        {/* Recipient */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recipient</CardTitle>
+            <CardDescription>Choose who will receive this message</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <div className="flex gap-2">
+                <Button
                   type="button"
-                  className={`type-option ${!isGroup ? "active" : ""}`}
+                  variant={!isGroup ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setIsGroup(false)}
+                  className="flex-1"
                 >
-                  👤 Contact
-                </button>
-                <button
+                  <User className="mr-2 h-4 w-4" />
+                  Contact
+                </Button>
+                <Button
                   type="button"
-                  className={`type-option ${isGroup ? "active" : ""}`}
+                  variant={isGroup ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setIsGroup(true)}
+                  className="flex-1"
                 >
-                  👥 Group
-                </button>
+                  <Users className="mr-2 h-4 w-4" />
+                  Group
+                </Button>
               </div>
-            </fieldset>
-          </div>
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="target" className="form-label">
-              {isGroup ? "Group Name" : "Phone Number"}
-            </label>
-            {isGroup ? (
-              <div className="target-with-groups">
-                <input
-                  id="target"
-                  type="text"
-                  className="form-input"
-                  placeholder="Enter group name exactly as it appears"
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value)}
-                  required
-                />
-                {groups.length > 0 && (
-                  <div className="groups-list">
-                    <span className="groups-label">Available groups:</span>
-                    {groups.slice(0, 5).map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        className="group-chip"
-                        onClick={() => setTarget(g.name)}
-                      >
-                        {g.name}
-                      </button>
-                    ))}
-                    {loadingGroups && <span className="spinner" />}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="target">{isGroup ? "Group Name" : "Phone Number"}</Label>
+              <Input
                 id="target"
-                type="tel"
-                className="form-input"
-                placeholder="+1234567890"
+                type={isGroup ? "text" : "tel"}
+                placeholder={isGroup ? "Enter group name exactly as it appears" : "+1234567890"}
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 required
               />
-            )}
-            <span className="form-help">
-              {isGroup
-                ? "Enter the exact group name (case-insensitive)"
-                : "Include country code without spaces or dashes"}
-            </span>
-          </div>
-        </div>
+              <p className="text-xs text-muted-foreground">
+                {isGroup
+                  ? "Enter the exact group name (case-insensitive)"
+                  : "Include country code without spaces or dashes"}
+              </p>
 
-        <div className="form-section">
-          <h2 className="section-title">Message</h2>
+              {isGroup && groups.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {loadingGroups ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {groups.slice(0, 8).map((g) => (
+                    <Badge
+                      key={g.id}
+                      variant={target === g.name ? "default" : "secondary"}
+                      className="cursor-pointer"
+                      onClick={() => setTarget(g.name)}
+                    >
+                      {g.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="form-group">
-            <label htmlFor="message" className="form-label">
-              Content
-            </label>
-            <textarea
+        {/* Message */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Message</CardTitle>
+            <CardDescription>Write the content that will be sent</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="message">Content</Label>
+            <Textarea
               id="message"
-              className="form-input form-textarea"
               placeholder="Type your message here..."
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               required
               rows={5}
+              className="resize-y"
             />
-            <span className="form-help">
-              {messageText.length} characters • Supports emojis and formatting
-            </span>
-          </div>
-        </div>
+            <p className="text-xs text-muted-foreground">{messageText.length} characters</p>
+          </CardContent>
+        </Card>
 
-        <div className="form-section">
-          <h2 className="section-title">Schedule</h2>
-
-          <div className="form-group">
-            <label htmlFor="cron" className="form-label">
-              Cron Expression
-            </label>
-            <input
-              id="cron"
-              type="text"
-              className="form-input cron-input"
-              placeholder="* * * * *"
-              value={cronExpression}
-              onChange={(e) => setCronExpression(e.target.value)}
-              required
-            />
-            <span className="form-help">Format: minute hour day-of-month month day-of-week</span>
-          </div>
-
-          <div className="presets">
-            <span className="presets-label">Quick presets:</span>
-            <div className="presets-grid">
-              {CRON_PRESETS.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  className={`preset-btn ${cronExpression === preset.value ? "active" : ""}`}
-                  onClick={() => handlePreset(preset.value)}
-                >
-                  {preset.label}
-                </button>
-              ))}
+        {/* Schedule */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Schedule</CardTitle>
+            <CardDescription>Define when this message should be sent</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cron">Cron Expression</Label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="cron"
+                  type="text"
+                  className="pl-9 font-mono"
+                  placeholder="* * * * *"
+                  value={cronExpression}
+                  onChange={(e) => setCronExpression(e.target.value)}
+                  required
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Format: minute hour day-of-month month day-of-week
+              </p>
             </div>
-          </div>
-        </div>
 
-        <div className="form-section">
-          <div className="form-row toggle-row">
+            <Separator />
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Quick presets</Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {CRON_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.value}
+                    type="button"
+                    variant={cronExpression === preset.value ? "default" : "outline"}
+                    size="sm"
+                    className={cn(
+                      "h-auto whitespace-normal py-2 text-xs",
+                      cronExpression === preset.value && "ring-2 ring-primary/20"
+                    )}
+                    onClick={() => setCronExpression(preset.value)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Enabled toggle */}
+        <Card>
+          <CardContent className="flex items-center justify-between py-4">
             <div>
-              <h2 className="section-title">Enabled</h2>
-              <p className="toggle-description">Schedule will run automatically when enabled</p>
+              <p className="text-sm font-medium">Enabled</p>
+              <p className="text-xs text-muted-foreground">
+                Schedule will run automatically when enabled
+              </p>
             </div>
-            <button
-              type="button"
-              className={`toggle ${enabled ? "active" : ""}`}
-              onClick={() => setEnabled(!enabled)}
-              aria-label={enabled ? "Disable" : "Enable"}
-            />
-          </div>
-        </div>
+            <Switch checked={enabled} onCheckedChange={setEnabled} />
+          </CardContent>
+        </Card>
 
-        <div className="form-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate("/messages")}>
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-3">
+          <Button type="button" variant="outline" onClick={() => navigate("/messages")}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? <span className="spinner" /> : isEditing ? "Save Changes" : "Create Schedule"}
-          </button>
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Save Changes" : "Create Schedule"}
+          </Button>
         </div>
       </form>
     </div>

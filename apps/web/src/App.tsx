@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { AuthProvider } from "./hooks/useAuth";
 import { ConnectPage } from "./pages/ConnectPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -13,20 +14,22 @@ export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/connect" element={<ConnectPage />} />
-              <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/messages/new" element={<MessageFormPage />} />
-              <Route path="/messages/:id" element={<MessageFormPage />} />
+        <TooltipProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/connect" element={<ConnectPage />} />
+                <Route path="/messages" element={<MessagesPage />} />
+                <Route path="/messages/new" element={<MessageFormPage />} />
+                <Route path="/messages/:id" element={<MessageFormPage />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </TooltipProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
@@ -6,8 +7,8 @@ export function ProtectedRoute() {
 
   if (loading) {
     return (
-      <div className="loading-screen">
-        <div className="spinner spinner-lg" />
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
