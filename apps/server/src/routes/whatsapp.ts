@@ -45,12 +45,11 @@ whatsappRoutes.get("/qr", async (c) => {
       }
     });
 
-    // Start connection if not already connected
+    // Start connection if not already connected/connecting
+    // (addEventHandler already replays current state to new handlers)
     const status = whatsappService.getStatus(user.id);
     if (status === "disconnected") {
       await whatsappService.connect(user.id);
-    } else if (status === "connected") {
-      await stream.writeSSE({ data: JSON.stringify({ type: "connected" }), event: "message" });
     }
 
     // Keep connection alive

@@ -8,17 +8,17 @@
     ".": {
       "types": "./src/index.ts",
       "bun": "./src/index.ts",
-      "import": "./src/index.ts"
+      "import": "./dist/index.js"
     },
     "./logger": {
       "types": "./src/logger.ts",
       "bun": "./src/logger.ts",
-      "import": "./src/logger.ts"
+      "import": "./dist/logger.js"
     },
     "./types": {
       "types": "./src/types.ts",
       "bun": "./src/types.ts",
-      "import": "./src/types.ts"
+      "import": "./dist/types.js"
     }
   },
   "scripts": {

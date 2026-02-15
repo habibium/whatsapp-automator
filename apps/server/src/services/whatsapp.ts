@@ -29,6 +29,7 @@ type ConnectionEventHandler = {
 type UserConnection = {
   socket: WASocket | null;
   status: "disconnected" | "connecting" | "awaiting_qr" | "connected";
+  lastQR: string | null;
   eventHandlers: Set<ConnectionEventHandler>;
 };
 
@@ -38,7 +39,7 @@ class WhatsAppService {
   private getOrCreateConnection(userId: string): UserConnection {
     let conn = this.connections.get(userId);
     if (!conn) {
-      conn = { socket: null, status: "disconnected", eventHandlers: new Set() };
+      conn = { socket: null, status: "disconnected", lastQR: null, eventHandlers: new Set() };
       this.connections.set(userId, conn);
     }
     return conn;
@@ -47,6 +48,14 @@ class WhatsAppService {
   addEventHandler(userId: string, handler: ConnectionEventHandler): () => void {
     const conn = this.getOrCreateConnection(userId);
     conn.eventHandlers.add(handler);
+
+    // Replay current state to the new handler
+    if (conn.status === "awaiting_qr" && conn.lastQR) {
+      handler.onQR(conn.lastQR);
+    } else if (conn.status === "connected") {
+      handler.onConnected();
+    }
+
     return () => conn.eventHandlers.delete(handler);
   }
 
@@ -83,6 +92,7 @@ class WhatsAppService {
 
       if (qr) {
         conn.status = "awaiting_qr";
+        conn.lastQR = qr;
         await updateWhatsAppStatus(userId, "awaiting_qr");
         for (const handler of conn.eventHandlers) {
           handler.onQR(qr);
@@ -96,6 +106,7 @@ class WhatsAppService {
 
         conn.status = "disconnected";
         conn.socket = null;
+        conn.lastQR = null;
         await updateWhatsAppStatus(userId, "disconnected");
 
         for (const handler of conn.eventHandlers) {
@@ -108,6 +119,7 @@ class WhatsAppService {
         }
       } else if (connection === "open") {
         conn.status = "connected";
+        conn.lastQR = null;
         await updateWhatsAppStatus(userId, "connected");
         logger.info({ userId }, "WhatsApp connected");
 
@@ -124,6 +136,7 @@ class WhatsAppService {
       conn.socket.end(undefined);
       conn.socket = null;
       conn.status = "disconnected";
+      conn.lastQR = null;
       await updateWhatsAppStatus(userId, "disconnected");
     }
   }

@@ -25,13 +25,13 @@ export function useWhatsApp() {
   }, [fetchStatus]);
 
   const connect = useCallback(async () => {
+    // Idempotent: skip if an EventSource is already open
+    if (eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.CLOSED) {
+      return;
+    }
+
     setLoading(true);
     setQrCode(null);
-
-    // Close existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
 
     // Start SSE stream for QR
     const eventSource = new EventSource("/api/whatsapp/qr", { withCredentials: true });
@@ -52,6 +52,7 @@ export function useWhatsApp() {
           setQrCode(null);
           setLoading(false);
           eventSource.close();
+          eventSourceRef.current = null;
         } else if (parsed.type === "disconnected") {
           setStatus("disconnected");
           setQrCode(null);
@@ -65,10 +66,12 @@ export function useWhatsApp() {
     eventSource.onerror = () => {
       setLoading(false);
       eventSource.close();
+      eventSourceRef.current = null;
     };
 
     return () => {
       eventSource.close();
+      eventSourceRef.current = null;
     };
   }, []);
 
@@ -76,6 +79,7 @@ export function useWhatsApp() {
     setLoading(true);
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
     await api.whatsapp.disconnect();
     setStatus("disconnected");

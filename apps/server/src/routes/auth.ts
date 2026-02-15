@@ -4,6 +4,9 @@ import { deleteCookie, setCookie } from "hono/cookie";
 import { createSession, createUser, deleteSession, getUserByEmail } from "../db/queries.js";
 import { type AuthContext, authMiddleware } from "../middleware/auth.js";
 
+// Only set Secure cookie flag when explicitly enabled (requires HTTPS)
+const secureCookie = process.env["COOKIE_SECURE"] === "true";
+
 export const authRoutes = new Hono<AuthContext>();
 
 // Register new user
@@ -38,7 +41,7 @@ authRoutes.post("/register", async (c) => {
   setCookie(c, "session", session.id, {
     path: "/",
     httpOnly: true,
-    secure: process.env["NODE_ENV"] === "production",
+    secure: secureCookie,
     sameSite: "Lax",
     expires: expiresAt
   });
@@ -76,7 +79,7 @@ authRoutes.post("/login", async (c) => {
   setCookie(c, "session", session.id, {
     path: "/",
     httpOnly: true,
-    secure: process.env["NODE_ENV"] === "production",
+    secure: secureCookie,
     sameSite: "Lax",
     expires: expiresAt
   });

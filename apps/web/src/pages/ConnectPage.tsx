@@ -6,7 +6,7 @@ export function ConnectPage() {
   const { status, qrCode, loading, connect, disconnect } = useWhatsApp();
 
   useEffect(() => {
-    if (status === "disconnected" && !loading) {
+    if (status !== "connected" && !loading) {
       connect();
     }
   }, [status, loading, connect]);

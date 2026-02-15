@@ -38,9 +38,9 @@ COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_module
 # Copy source code
 COPY . .
 
-# Build shared package first
+# Build shared package first (clean build to ensure dist/ is emitted)
 WORKDIR /app/packages/shared
-RUN bun run build
+RUN rm -f tsconfig.tsbuildinfo && bun run build && ls dist/
 
 # Build web app
 WORKDIR /app/apps/web
@@ -51,31 +51,35 @@ WORKDIR /app/apps/server
 RUN bun run build
 
 # ============================================
-# Stage 4: Production image
+# Stage 4: Production image (Node.js runtime)
 # ============================================
-FROM oven/bun:1-alpine AS production
+# Use Node.js for production because Baileys requires WebSocket events
+# (upgrade, unexpected-response) that Bun does not implement.
+FROM node:22-alpine AS production
 WORKDIR /app
 
-# Install runtime dependencies for native modules
-RUN apk add --no-cache python3 make g++ linux-headers
-
-# Copy package files for production install
-COPY package.json bun.lock ./
+# Copy package files
+COPY package.json ./
 COPY apps/server/package.json ./apps/server/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install production dependencies only
-RUN bun install --frozen-lockfile --production
+# Copy node_modules from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 
 # Copy built artifacts
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/src ./packages/shared/src
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
-# Copy Drizzle migrations
+# Copy Drizzle migrations and schema (needed by drizzle-kit migrate)
 COPY apps/server/drizzle ./apps/server/drizzle
 COPY apps/server/drizzle.config.ts ./apps/server/
+
+# Copy entrypoint script
+COPY entrypoint.sh /app/apps/server/entrypoint.sh
+RUN chmod +x /app/apps/server/entrypoint.sh
 
 # Set environment
 ENV NODE_ENV=production
@@ -85,9 +89,9 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Start the server
+# Start the server (migrations run automatically)
 WORKDIR /app/apps/server
-CMD ["bun", "run", "start"]
+CMD ["./entrypoint.sh"]

@@ -23,8 +23,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
     container_name: whatsapp-scheduler-app
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       db:
         condition: service_healthy
