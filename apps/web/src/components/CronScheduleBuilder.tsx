@@ -8,7 +8,15 @@ type CronScheduleBuilderProps = {
   onChange: (value: string) => void;
 };
 
-type Frequency = "every-minute" | "every-n-minutes" | "hourly" | "daily" | "weekly" | "monthly";
+type Frequency =
+  | "every-second"
+  | "every-n-seconds"
+  | "every-minute"
+  | "every-n-minutes"
+  | "hourly"
+  | "daily"
+  | "weekly"
+  | "monthly";
 
 const DAYS_OF_WEEK = [
   { value: "0", label: "Sunday" },
@@ -28,107 +36,198 @@ const MINUTE_INTERVALS = [
   { value: "30", label: "30 minutes" }
 ] as const;
 
+const SECOND_INTERVALS = [
+  { value: "2", label: "2 seconds" },
+  { value: "5", label: "5 seconds" },
+  { value: "10", label: "10 seconds" },
+  { value: "15", label: "15 seconds" },
+  { value: "30", label: "30 seconds" }
+] as const;
+
 function parseCronToState(cron: string): {
   frequency: Frequency;
+  second: string;
   minute: string;
   hour: string;
   dayOfMonth: string;
   dayOfWeek: string;
-  interval: string;
+  minuteInterval: string;
+  secondInterval: string;
 } {
   if (!cron) {
     return {
       frequency: "daily",
+      second: "0",
       minute: "0",
       hour: "9",
       dayOfMonth: "1",
       dayOfWeek: "1",
-      interval: "5"
+      minuteInterval: "5",
+      secondInterval: "5"
     };
   }
+
   const parts = cron.trim().split(/\s+/);
-  if (parts.length !== 5) {
+  if (parts.length !== 5 && parts.length !== 6) {
     return {
       frequency: "daily",
+      second: "0",
       minute: "0",
       hour: "9",
       dayOfMonth: "1",
       dayOfWeek: "1",
-      interval: "5"
+      minuteInterval: "5",
+      secondInterval: "5"
     };
   }
 
-  const [minute, hour, dayOfMonth, , dayOfWeek] = parts;
+  const [second, minute, hour, dayOfMonth, month, dayOfWeek] =
+    parts.length === 6 ? parts : ["0", ...parts];
 
-  // Every minute
-  if (minute === "*" && hour === "*" && dayOfMonth === "*" && dayOfWeek === "*") {
+  // Every second
+  if (
+    second === "*" &&
+    minute === "*" &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
     return {
-      frequency: "every-minute",
+      frequency: "every-second",
+      second: "0",
       minute: "0",
       hour: "0",
       dayOfMonth: "1",
       dayOfWeek: "1",
-      interval: "5"
+      minuteInterval: "5",
+      secondInterval: "5"
+    };
+  }
+
+  // Every N seconds
+  if (
+    second?.startsWith("*/") &&
+    minute === "*" &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    const secondInterval = second.slice(2);
+    return {
+      frequency: "every-n-seconds",
+      second: "0",
+      minute: "0",
+      hour: "0",
+      dayOfMonth: "1",
+      dayOfWeek: "1",
+      minuteInterval: "5",
+      secondInterval
+    };
+  }
+
+  // Every minute
+  if (
+    (second === "0" || second === "*") &&
+    minute === "*" &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    return {
+      frequency: "every-minute",
+      second: "0",
+      minute: "0",
+      hour: "0",
+      dayOfMonth: "1",
+      dayOfWeek: "1",
+      minuteInterval: "5",
+      secondInterval: "5"
     };
   }
 
   // Every N minutes
-  if (minute?.startsWith("*/") && hour === "*") {
-    const interval = minute.slice(2);
+  if (
+    (second === "0" || second === "*") &&
+    minute?.startsWith("*/") &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    const minuteInterval = minute.slice(2);
     return {
       frequency: "every-n-minutes",
+      second: "0",
       minute: "0",
       hour: "0",
       dayOfMonth: "1",
       dayOfWeek: "1",
-      interval
+      minuteInterval,
+      secondInterval: "5"
     };
   }
 
   // Hourly
-  if (hour === "*" && dayOfMonth === "*" && dayOfWeek === "*") {
+  if (
+    (second === "0" || second === "*") &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
     return {
       frequency: "hourly",
+      second,
       minute: minute ?? "0",
       hour: "0",
       dayOfMonth: "1",
       dayOfWeek: "1",
-      interval: "5"
+      minuteInterval: "5",
+      secondInterval: "5"
     };
   }
 
   // Weekly
-  if (dayOfMonth === "*" && dayOfWeek !== "*") {
+  if ((second === "0" || second === "*") && dayOfMonth === "*" && dayOfWeek !== "*") {
     return {
       frequency: "weekly",
+      second,
       minute: minute ?? "0",
       hour: hour ?? "9",
       dayOfMonth: "1",
       dayOfWeek: dayOfWeek ?? "1",
-      interval: "5"
+      minuteInterval: "5",
+      secondInterval: "5"
     };
   }
 
   // Monthly
-  if (dayOfMonth !== "*" && dayOfWeek === "*") {
+  if ((second === "0" || second === "*") && dayOfMonth !== "*" && dayOfWeek === "*") {
     return {
       frequency: "monthly",
+      second,
       minute: minute ?? "0",
       hour: hour ?? "9",
       dayOfMonth: dayOfMonth ?? "1",
       dayOfWeek: "1",
-      interval: "5"
+      minuteInterval: "5",
+      secondInterval: "5"
     };
   }
 
   // Daily (default)
   return {
     frequency: "daily",
+    second,
     minute: minute ?? "0",
     hour: hour ?? "9",
     dayOfMonth: "1",
     dayOfWeek: "1",
-    interval: "5"
+    minuteInterval: "5",
+    secondInterval: "5"
   };
 }
 
@@ -138,13 +237,18 @@ function buildCron(
   hour: string,
   dayOfMonth: string,
   dayOfWeek: string,
-  interval: string
+  minuteInterval: string,
+  secondInterval: string
 ): string {
   switch (frequency) {
+    case "every-second":
+      return "* * * * * *";
+    case "every-n-seconds":
+      return `*/${secondInterval} * * * * *`;
     case "every-minute":
       return "* * * * *";
     case "every-n-minutes":
-      return `*/${interval} * * * *`;
+      return `*/${minuteInterval} * * * *`;
     case "hourly":
       return `${minute} * * * *`;
     case "daily":
@@ -160,31 +264,82 @@ function buildCron(
 export function describeCron(cron: string): string {
   if (!cron) return "No schedule set";
   const parts = cron.trim().split(/\s+/);
-  if (parts.length !== 5) return "Invalid schedule";
+  if (parts.length !== 5 && parts.length !== 6) return "Invalid schedule";
 
-  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  const [second, minute, hour, dayOfMonth, month, dayOfWeek] =
+    parts.length === 6 ? parts : ["0", ...parts];
+
+  // Every second
+  if (
+    second === "*" &&
+    minute === "*" &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    return "Every second";
+  }
+
+  // Every N seconds
+  if (
+    second?.startsWith("*/") &&
+    minute === "*" &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    const n = second.slice(2);
+    return `Every ${n} seconds`;
+  }
 
   // Every minute
-  if (minute === "*" && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+  if (
+    (second === "0" || second === "*") &&
+    minute === "*" &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
     return "Every minute";
   }
 
   // Every N minutes
-  if (minute?.startsWith("*/") && hour === "*") {
+  if (
+    (second === "0" || second === "*") &&
+    minute?.startsWith("*/") &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
     const n = minute.slice(2);
     return `Every ${n} minutes`;
   }
 
   // Hourly
-  if (hour === "*" && dayOfMonth === "*" && dayOfWeek === "*") {
+  if (
+    (second === "0" || second === "*") &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
     const min = Number.parseInt(minute ?? "0", 10);
-    const minStr = min === 0 ? "on the hour" : `at ${min} minute${min !== 1 ? "s" : ""} past`;
+    const sec = Number.parseInt(second ?? "0", 10);
+    const minStr =
+      min === 0 && sec === 0
+        ? "on the hour"
+        : `at ${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
     return `Every hour ${minStr}`;
   }
 
+  const s = Number.parseInt(second ?? "0", 10);
   const h = Number.parseInt(hour ?? "0", 10);
   const m = Number.parseInt(minute ?? "0", 10);
-  const timeStr = formatTime(h, m);
+  const timeStr = formatTime(h, m, s);
 
   // Weekly
   if (dayOfMonth === "*" && dayOfWeek !== "*" && month === "*") {
@@ -219,11 +374,12 @@ export function describeCron(cron: string): string {
   return `Runs at: ${cron}`;
 }
 
-function formatTime(hour: number, minute: number): string {
+function formatTime(hour: number, minute: number, second = 0): string {
   const period = hour >= 12 ? "PM" : "AM";
   const h = hour % 12 || 12;
   const m = minute.toString().padStart(2, "0");
-  return `${h}:${m} ${period}`;
+  const s = second.toString().padStart(2, "0");
+  return second > 0 ? `${h}:${m}:${s} ${period}` : `${h}:${m} ${period}`;
 }
 
 function getDayName(day: string): string {
@@ -254,7 +410,8 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
   const [hour, setHour] = useState(parsed.hour);
   const [dayOfMonth, setDayOfMonth] = useState(parsed.dayOfMonth);
   const [dayOfWeek, setDayOfWeek] = useState(parsed.dayOfWeek);
-  const [interval, setInterval] = useState(parsed.interval);
+  const [minuteInterval, setMinuteInterval] = useState(parsed.minuteInterval);
+  const [secondInterval, setSecondInterval] = useState(parsed.secondInterval);
 
   // Sync local state when the external cron value changes (e.g. when editing existing message)
   useEffect(() => {
@@ -264,12 +421,21 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
     setHour(p.hour);
     setDayOfMonth(p.dayOfMonth);
     setDayOfWeek(p.dayOfWeek);
-    setInterval(p.interval);
+    setMinuteInterval(p.minuteInterval);
+    setSecondInterval(p.secondInterval);
   }, [value]);
 
   const updateCron = useCallback(
-    (f: Frequency, m: string, h: string, dom: string, dow: string, intv: string) => {
-      const newCron = buildCron(f, m, h, dom, dow, intv);
+    (
+      f: Frequency,
+      m: string,
+      h: string,
+      dom: string,
+      dow: string,
+      minuteIntv: string,
+      secondIntv: string
+    ) => {
+      const newCron = buildCron(f, m, h, dom, dow, minuteIntv, secondIntv);
       if (newCron !== value) {
         onChange(newCron);
       }
@@ -279,32 +445,37 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
 
   const handleFrequencyChange = (f: Frequency) => {
     setFrequency(f);
-    updateCron(f, minute, hour, dayOfMonth, dayOfWeek, interval);
+    updateCron(f, minute, hour, dayOfMonth, dayOfWeek, minuteInterval, secondInterval);
   };
 
   const handleMinuteChange = (m: string) => {
     setMinute(m);
-    updateCron(frequency, m, hour, dayOfMonth, dayOfWeek, interval);
+    updateCron(frequency, m, hour, dayOfMonth, dayOfWeek, minuteInterval, secondInterval);
   };
 
   const handleHourChange = (h: string) => {
     setHour(h);
-    updateCron(frequency, minute, h, dayOfMonth, dayOfWeek, interval);
+    updateCron(frequency, minute, h, dayOfMonth, dayOfWeek, minuteInterval, secondInterval);
   };
 
   const handleDayOfMonthChange = (d: string) => {
     setDayOfMonth(d);
-    updateCron(frequency, minute, hour, d, dayOfWeek, interval);
+    updateCron(frequency, minute, hour, d, dayOfWeek, minuteInterval, secondInterval);
   };
 
   const handleDayOfWeekChange = (d: string) => {
     setDayOfWeek(d);
-    updateCron(frequency, minute, hour, dayOfMonth, d, interval);
+    updateCron(frequency, minute, hour, dayOfMonth, d, minuteInterval, secondInterval);
   };
 
-  const handleIntervalChange = (intv: string) => {
-    setInterval(intv);
-    updateCron(frequency, minute, hour, dayOfMonth, dayOfWeek, intv);
+  const handleMinuteIntervalChange = (intv: string) => {
+    setMinuteInterval(intv);
+    updateCron(frequency, minute, hour, dayOfMonth, dayOfWeek, intv, secondInterval);
+  };
+
+  const handleSecondIntervalChange = (intv: string) => {
+    setSecondInterval(intv);
+    updateCron(frequency, minute, hour, dayOfMonth, dayOfWeek, minuteInterval, intv);
   };
 
   const description = describeCron(value);
@@ -317,7 +488,8 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
   const showHour = frequency === "daily" || frequency === "weekly" || frequency === "monthly";
   const showDayOfWeek = frequency === "weekly";
   const showDayOfMonth = frequency === "monthly";
-  const showInterval = frequency === "every-n-minutes";
+  const showMinuteInterval = frequency === "every-n-minutes";
+  const showSecondInterval = frequency === "every-n-seconds";
 
   return (
     <div className="space-y-4">
@@ -332,6 +504,8 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="every-second">Every second</SelectItem>
+            <SelectItem value="every-n-seconds">Every N seconds</SelectItem>
             <SelectItem value="every-minute">Every minute</SelectItem>
             <SelectItem value="every-n-minutes">Every N minutes</SelectItem>
             <SelectItem value="hourly">Hourly</SelectItem>
@@ -342,11 +516,30 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
         </Select>
       </div>
 
-      {/* Interval for every-n-minutes */}
-      {showInterval ? (
+      {/* Interval for every-n-seconds */}
+      {showSecondInterval ? (
         <div className="space-y-2">
           <Label className="text-sm font-medium">Interval</Label>
-          <Select value={interval} onValueChange={handleIntervalChange}>
+          <Select value={secondInterval} onValueChange={handleSecondIntervalChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SECOND_INTERVALS.map((si) => (
+                <SelectItem key={si.value} value={si.value}>
+                  Every {si.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      {/* Interval for every-n-minutes */}
+      {showMinuteInterval ? (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Interval</Label>
+          <Select value={minuteInterval} onValueChange={handleMinuteIntervalChange}>
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
