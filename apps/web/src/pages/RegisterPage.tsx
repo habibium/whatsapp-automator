@@ -1,6 +1,7 @@
 import { CalendarClock, Eye, EyeOff, Loader2 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type SubmitEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Footer } from "../components/Footer";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
@@ -27,7 +28,7 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -48,6 +49,7 @@ export function RegisterPage() {
       setError(err);
       setLoading(false);
     } else {
+      toast.success("Account created successfully!");
       navigate("/");
     }
   };

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, type User } from "../lib/api";
+import { authApi, getErrorMessage, type User } from "../lib/api";
 
 interface AuthState {
   user: User | null;
@@ -16,38 +16,48 @@ export const useAuthStore = create<AuthState>()((set) => ({
   loading: true,
 
   initialize: async () => {
-    const result = await api.auth.me();
-    set({
-      user: result.success ? result.data : null,
-      loading: false
-    });
+    try {
+      const user = await authApi.me();
+      set({ user, loading: false });
+    } catch {
+      set({ user: null, loading: false });
+    }
   },
 
   refresh: async () => {
-    const result = await api.auth.me();
-    set({ user: result.success ? result.data : null });
+    try {
+      const user = await authApi.me();
+      set({ user });
+    } catch {
+      set({ user: null });
+    }
   },
 
   login: async (email, password) => {
-    const result = await api.auth.login(email, password);
-    if (result.success) {
-      set({ user: result.data });
+    try {
+      const user = await authApi.login(email, password);
+      set({ user });
       return null;
+    } catch (error) {
+      return getErrorMessage(error);
     }
-    return result.error;
   },
 
   register: async (email, password) => {
-    const result = await api.auth.register(email, password);
-    if (result.success) {
-      set({ user: result.data });
+    try {
+      const user = await authApi.register(email, password);
+      set({ user });
       return null;
+    } catch (error) {
+      return getErrorMessage(error);
     }
-    return result.error;
   },
 
   logout: async () => {
-    await api.auth.logout();
-    set({ user: null });
+    try {
+      await authApi.logout();
+    } finally {
+      set({ user: null });
+    }
   }
 }));

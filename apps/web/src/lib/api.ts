@@ -1,24 +1,9 @@
-// Use env variable if set, otherwise use relative URL (works with Vite proxy in dev)
-const API_BASE = import.meta.env["VITE_API_URL"] || "/api";
+import { apiClient } from "./api-client";
 
-export function buildApiUrl(endpoint: string): string {
-  return `${API_BASE}${endpoint}`;
-}
+// Re-export for convenience
+export { ApiError, buildApiUrl, getErrorMessage } from "./api-client";
 
-type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
-
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-  const response = await fetch(buildApiUrl(endpoint), {
-    ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers
-    }
-  });
-
-  return response.json() as Promise<ApiResponse<T>>;
-}
+// ── Types ──────────────────────────────────────────────────────────
 
 export type User = {
   id: string;
@@ -38,6 +23,12 @@ export type ScheduledMessage = {
   updatedAt: string;
 };
 
+export type CreateMessageInput = Omit<
+  ScheduledMessage,
+  "id" | "userId" | "createdAt" | "updatedAt"
+>;
+export type UpdateMessageInput = Partial<CreateMessageInput>;
+
 export type WhatsAppStatus = "connected" | "disconnected" | "connecting" | "awaiting_qr";
 
 export type WhatsAppGroup = {
@@ -45,54 +36,46 @@ export type WhatsAppGroup = {
   name: string;
 };
 
-// Auth API
-export const api = {
-  auth: {
-    register: (email: string, password: string) =>
-      request<User>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email, password })
-      }),
+// ── Auth API ───────────────────────────────────────────────────────
 
-    login: (email: string, password: string) =>
-      request<User>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password })
-      }),
+export const authApi = {
+  login: (email: string, password: string) =>
+    apiClient.post<User>("/auth/login", { email, password }).then((r) => r.data),
 
-    logout: () => request<null>("/auth/logout", { method: "POST" }),
+  register: (email: string, password: string) =>
+    apiClient.post<User>("/auth/register", { email, password }).then((r) => r.data),
 
-    me: () => request<User>("/auth/me")
-  },
+  logout: () => apiClient.post("/auth/logout").then((r) => r.data),
 
-  whatsapp: {
-    status: () => request<{ status: WhatsAppStatus }>("/whatsapp/status"),
+  me: () => apiClient.get<User>("/auth/me").then((r) => r.data)
+};
 
-    connect: () => request<{ status: WhatsAppStatus }>("/whatsapp/connect", { method: "POST" }),
+// ── WhatsApp API ───────────────────────────────────────────────────
 
-    disconnect: () =>
-      request<{ status: WhatsAppStatus }>("/whatsapp/disconnect", { method: "POST" }),
+export const whatsappApi = {
+  status: () => apiClient.get<{ status: WhatsAppStatus }>("/whatsapp/status").then((r) => r.data),
 
-    groups: () => request<WhatsAppGroup[]>("/whatsapp/groups")
-  },
+  connect: () =>
+    apiClient.post<{ status: WhatsAppStatus }>("/whatsapp/connect").then((r) => r.data),
 
-  messages: {
-    list: () => request<ScheduledMessage[]>("/messages"),
+  disconnect: () =>
+    apiClient.post<{ status: WhatsAppStatus }>("/whatsapp/disconnect").then((r) => r.data),
 
-    get: (id: string) => request<ScheduledMessage>(`/messages/${id}`),
+  groups: () => apiClient.get<WhatsAppGroup[]>("/whatsapp/groups").then((r) => r.data)
+};
 
-    create: (data: Omit<ScheduledMessage, "id" | "userId" | "createdAt" | "updatedAt">) =>
-      request<ScheduledMessage>("/messages", {
-        method: "POST",
-        body: JSON.stringify(data)
-      }),
+// ── Messages API ───────────────────────────────────────────────────
 
-    update: (id: string, data: Partial<ScheduledMessage>) =>
-      request<ScheduledMessage>(`/messages/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data)
-      }),
+export const messagesApi = {
+  list: () => apiClient.get<ScheduledMessage[]>("/messages").then((r) => r.data),
 
-    delete: (id: string) => request<null>(`/messages/${id}`, { method: "DELETE" })
-  }
+  get: (id: string) => apiClient.get<ScheduledMessage>(`/messages/${id}`).then((r) => r.data),
+
+  create: (data: CreateMessageInput) =>
+    apiClient.post<ScheduledMessage>("/messages", data).then((r) => r.data),
+
+  update: (id: string, data: UpdateMessageInput) =>
+    apiClient.put<ScheduledMessage>(`/messages/${id}`, data).then((r) => r.data),
+
+  delete: (id: string) => apiClient.delete(`/messages/${id}`).then((r) => r.data)
 };

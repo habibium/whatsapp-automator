@@ -1,6 +1,7 @@
 import { CalendarClock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Footer } from "../components/Footer";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
@@ -35,6 +36,7 @@ export function LoginPage() {
       setError(err);
       setLoading(false);
     } else {
+      toast.success("Welcome back!");
       navigate("/");
     }
   };

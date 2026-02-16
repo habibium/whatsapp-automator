@@ -1,65 +1,89 @@
-import { ArrowLeft, Loader2, MessageSquareText, Save, Send, User, Users } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Loader2,
+  MessageSquareText,
+  Save,
+  Send,
+  User,
+  Users
+} from "lucide-react";
+import { type SubmitEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CronScheduleBuilder } from "../components/CronScheduleBuilder";
 import { GroupCombobox } from "../components/GroupCombobox";
 import { TemplateVariableChips } from "../components/TemplateVariableChips";
-import { Alert, AlertDescription } from "../components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Skeleton } from "../components/ui/skeleton";
 import { Switch } from "../components/ui/switch";
 import { Textarea } from "../components/ui/textarea";
-import { api, type WhatsAppGroup } from "../lib/api";
-import { useMessagesStore } from "../stores/messages";
+import { useCreateMessage, useMessage, useUpdateMessage, useWhatsAppGroups } from "../lib/queries";
+
+function FormSkeleton() {
+  return (
+    <div className="mx-auto max-w-2xl space-y-5 pb-8">
+      <div className="mb-8 flex items-center gap-4">
+        <Skeleton className="h-9 w-9 rounded" />
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+      </div>
+      {Array.from({ length: 3 }).map((_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards have no stable id
+        <Card key={i}>
+          <CardHeader className="pb-4">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-4 w-48" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 export function MessageFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { create, update: updateMessage } = useMessagesStore();
+  const isEditing = Boolean(id);
 
-  const [loadingMessage, setLoadingMessage] = useState(Boolean(id));
+  // Queries
+  const { data: existingMessage, isLoading: loadingMessage, error: messageError } = useMessage(id);
+  const createMutation = useCreateMessage();
+  const updateMutation = useUpdateMessage();
+
+  // Form state
   const [target, setTarget] = useState("");
   const [isGroup, setIsGroup] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [cronExpression, setCronExpression] = useState("0 9 * * *");
   const [enabled, setEnabled] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [groups, setGroups] = useState<WhatsAppGroup[]>([]);
-  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [formReady, setFormReady] = useState(!isEditing);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isEditing = Boolean(id);
 
-  useEffect(() => {
-    if (!id) return;
-    setLoadingMessage(true);
-    api.messages.get(id).then((result) => {
-      if (result.success) {
-        const msg = result.data;
-        setTarget(msg.target);
-        setIsGroup(msg.isGroup);
-        setMessageText(msg.message);
-        setCronExpression(msg.cronExpression);
-        setEnabled(msg.enabled);
-      }
-      setLoadingMessage(false);
-    });
-  }, [id]);
+  // Groups query — only fetch when isGroup is true
+  const { data: groups = [], isLoading: loadingGroups } = useWhatsAppGroups(isGroup);
 
+  // Populate form when existing message loads
   useEffect(() => {
-    if (isGroup && groups.length === 0) {
-      setLoadingGroups(true);
-      api.whatsapp.groups().then((result) => {
-        if (result.success) {
-          setGroups(result.data);
-        }
-        setLoadingGroups(false);
-      });
+    if (existingMessage && !formReady) {
+      setTarget(existingMessage.target);
+      setIsGroup(existingMessage.isGroup);
+      setMessageText(existingMessage.message);
+      setCronExpression(existingMessage.cronExpression);
+      setEnabled(existingMessage.enabled);
+      setFormReady(true);
     }
-  }, [isGroup, groups.length]);
+  }, [existingMessage, formReady]);
 
   const handleInsertVariable = useCallback((variable: string) => {
     const textarea = textareaRef.current;
@@ -75,7 +99,6 @@ export function MessageFormPage() {
 
     setMessageText(before + variable + after);
 
-    // Restore cursor position after the inserted variable
     requestAnimationFrame(() => {
       const newPos = start + variable.length;
       textarea.focus();
@@ -83,10 +106,10 @@ export function MessageFormPage() {
     });
   }, []);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const saving = createMutation.isPending || updateMutation.isPending;
+
+  const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault();
-    setError(null);
-    setSaving(true);
 
     const data = {
       target,
@@ -96,28 +119,38 @@ export function MessageFormPage() {
       enabled
     };
 
-    let err: string | null;
-    if (isEditing && id) {
-      err = await updateMessage(id, data);
-    } else {
-      err = await create(data);
-    }
+    const onSuccess = () => navigate("/");
 
-    if (err) {
-      setError(err);
-      setSaving(false);
+    if (isEditing && id) {
+      updateMutation.mutate({ id, data }, { onSuccess });
     } else {
-      navigate("/");
+      createMutation.mutate(data, { onSuccess });
     }
   };
 
   if (loadingMessage && isEditing) {
+    return <FormSkeleton />;
+  }
+
+  if (messageError && isEditing) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="mx-auto max-w-2xl pb-8">
+        <div className="mb-8 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight">Edit Message</h1>
+        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Failed to load message</AlertTitle>
+          <AlertDescription>The message could not be found or an error occurred.</AlertDescription>
+        </Alert>
       </div>
     );
   }
+
+  const mutationError = createMutation.error || updateMutation.error;
 
   return (
     <div className="mx-auto max-w-2xl pb-8">
@@ -139,9 +172,12 @@ export function MessageFormPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {error ? (
+        {mutationError ? (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {mutationError instanceof Error ? mutationError.message : "Something went wrong"}
+            </AlertDescription>
           </Alert>
         ) : null}
 

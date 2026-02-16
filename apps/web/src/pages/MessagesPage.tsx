@@ -6,10 +6,21 @@ import {
   type SortingState,
   useReactTable
 } from "@tanstack/react-table";
-import { ArrowUpDown, Inbox, Loader2, Pencil, Plus, Trash2, User, Users } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  ArrowUpDown,
+  Inbox,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  User,
+  Users
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { describeCron } from "../components/CronScheduleBuilder";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import {
@@ -20,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle
 } from "../components/ui/dialog";
+import { Skeleton } from "../components/ui/skeleton";
 import { Switch } from "../components/ui/switch";
 import {
   Table,
@@ -31,31 +43,69 @@ import {
 } from "../components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
 import type { ScheduledMessage } from "../lib/api";
-import { useMessagesStore } from "../stores/messages";
+import { useDeleteMessage, useMessages, useToggleMessage } from "../lib/queries";
+
+function TableSkeleton() {
+  return (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Target</TableHead>
+            <TableHead>Message</TableHead>
+            <TableHead>Schedule</TableHead>
+            <TableHead className="text-center">Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 5 }).map((_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows have no stable id
+            <TableRow key={i}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-4 rounded" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-40" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-28" />
+              </TableCell>
+              <TableCell>
+                <div className="flex justify-center">
+                  <Skeleton className="h-5 w-9 rounded-full" />
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center justify-end gap-1">
+                  <Skeleton className="h-8 w-8 rounded" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
 
 export function MessagesPage() {
-  const { messages, loading, toggleEnabled, remove, fetch: fetchMessages } = useMessagesStore();
+  const { data: messages = [], isLoading, error } = useMessages();
+  const toggleMutation = useToggleMessage();
+  const deleteMutation = useDeleteMessage();
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
 
-  useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
-
-  const handleToggle = useCallback(
-    async (id: string, currentEnabled: boolean) => {
-      await toggleEnabled(id, !currentEnabled);
-    },
-    [toggleEnabled]
-  );
-
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deleteId) return;
-    setDeleting(true);
-    await remove(deleteId);
-    setDeleting(false);
-    setDeleteId(null);
+    deleteMutation.mutate(deleteId, {
+      onSettled: () => setDeleteId(null)
+    });
   };
 
   const columns = useMemo<ColumnDef<ScheduledMessage>[]>(
@@ -146,7 +196,9 @@ export function MessagesPage() {
                 <div className="flex justify-center">
                   <Switch
                     checked={msg.enabled}
-                    onCheckedChange={() => handleToggle(msg.id, msg.enabled)}
+                    onCheckedChange={() =>
+                      toggleMutation.mutate({ id: msg.id, enabled: !msg.enabled })
+                    }
                   />
                 </div>
               </TooltipTrigger>
@@ -191,7 +243,7 @@ export function MessagesPage() {
         enableSorting: false
       }
     ],
-    [handleToggle]
+    [toggleMutation]
   );
 
   const table = useReactTable({
@@ -218,10 +270,16 @@ export function MessagesPage() {
         </Button>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Failed to load messages</AlertTitle>
+          <AlertDescription>
+            Something went wrong while fetching your messages. Please try again.
+          </AlertDescription>
+        </Alert>
+      ) : isLoading ? (
+        <TableSkeleton />
       ) : messages.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
@@ -279,11 +337,19 @@ export function MessagesPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleting}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteId(null)}
+              disabled={deleteMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Delete
             </Button>
           </DialogFooter>

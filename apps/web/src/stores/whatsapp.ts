@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, buildApiUrl, type WhatsAppStatus } from "../lib/api";
+import { buildApiUrl, type WhatsAppStatus, whatsappApi } from "../lib/api";
 
 type QREvent =
   | { type: "qr"; data: string }
@@ -24,11 +24,12 @@ export const useWhatsAppStore = create<WhatsAppState>()((set, get) => ({
   eventSource: null,
 
   fetchStatus: async () => {
-    const result = await api.whatsapp.status();
-    if (result.success) {
-      set({ status: result.data.status });
+    try {
+      const data = await whatsappApi.status();
+      set({ status: data.status, loading: false });
+    } catch {
+      set({ loading: false });
     }
-    set({ loading: false });
   },
 
   connect: () => {
@@ -75,8 +76,11 @@ export const useWhatsAppStore = create<WhatsAppState>()((set, get) => ({
       eventSource.close();
       set({ eventSource: null });
     }
-    await api.whatsapp.disconnect();
-    set({ status: "disconnected", qrCode: null, loading: false });
+    try {
+      await whatsappApi.disconnect();
+    } finally {
+      set({ status: "disconnected", qrCode: null, loading: false });
+    }
   },
 
   cleanup: () => {
