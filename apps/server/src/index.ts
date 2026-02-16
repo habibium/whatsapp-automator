@@ -53,6 +53,17 @@ app.route("/api/messages", messagesRoutes);
 // Health check
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
+// Server timezone info
+app.get("/api/timezone", (c) => {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const offset = -new Date().getTimezoneOffset();
+  const sign = offset >= 0 ? "+" : "-";
+  const absH = Math.floor(Math.abs(offset) / 60);
+  const absM = Math.abs(offset) % 60;
+  const gmt = `GMT${sign}${absH}${absM > 0 ? `:${String(absM).padStart(2, "0")}` : ""}`;
+  return c.json({ timezone: tz, offset: gmt });
+});
+
 // Serve static files for production
 const staticDir = join(import.meta.dirname, "../../web/dist");
 
