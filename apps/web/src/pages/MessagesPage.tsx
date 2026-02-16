@@ -1,5 +1,13 @@
-import { Inbox, Loader2, Pencil, Plus, Trash2, User, Users } from "lucide-react";
-import { useState } from "react";
+import {
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable
+} from "@tanstack/react-table";
+import { ArrowUpDown, Inbox, Loader2, Pencil, Plus, Trash2, User, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { describeCron } from "../components/CronScheduleBuilder";
 import { Button } from "../components/ui/button";
@@ -22,16 +30,25 @@ import {
   TableRow
 } from "../components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
-import { useMessages } from "../hooks/useMessages";
+import type { ScheduledMessage } from "../lib/api";
+import { useMessagesStore } from "../stores/messages";
 
 export function MessagesPage() {
-  const { messages, loading, toggleEnabled, remove } = useMessages();
+  const { messages, loading, toggleEnabled, remove, fetch: fetchMessages } = useMessagesStore();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sorting, setSorting] = useState<SortingState>([]);
 
-  const handleToggle = async (id: string, currentEnabled: boolean) => {
-    await toggleEnabled(id, !currentEnabled);
-  };
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  const handleToggle = useCallback(
+    async (id: string, currentEnabled: boolean) => {
+      await toggleEnabled(id, !currentEnabled);
+    },
+    [toggleEnabled]
+  );
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -41,8 +58,153 @@ export function MessagesPage() {
     setDeleteId(null);
   };
 
+  const columns = useMemo<ColumnDef<ScheduledMessage>[]>(
+    () => [
+      {
+        accessorKey: "target",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Target
+            <ArrowUpDown className="ml-1.5 h-3.5 w-3.5" />
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const msg = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              {msg.isGroup ? (
+                <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
+              <span className="font-medium">{msg.target}</span>
+            </div>
+          );
+        }
+      },
+      {
+        accessorKey: "message",
+        header: "Message",
+        cell: ({ row }) => (
+          <span className="line-clamp-1 max-w-50 text-muted-foreground">
+            {row.original.message}
+          </span>
+        ),
+        enableSorting: false
+      },
+      {
+        accessorKey: "cronExpression",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Schedule
+            <ArrowUpDown className="ml-1.5 h-3.5 w-3.5" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-default text-sm text-foreground">
+                {describeCron(row.original.cronExpression)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <code className="font-mono text-xs">{row.original.cronExpression}</code>
+            </TooltipContent>
+          </Tooltip>
+        )
+      },
+      {
+        accessorKey: "enabled",
+        header: ({ column }) => (
+          <div className="text-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            >
+              Status
+              <ArrowUpDown className="ml-1.5 h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+        cell: ({ row }) => {
+          const msg = row.original;
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex justify-center">
+                  <Switch
+                    checked={msg.enabled}
+                    onCheckedChange={() => handleToggle(msg.id, msg.enabled)}
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{msg.enabled ? "Disable" : "Enable"}</TooltipContent>
+            </Tooltip>
+          );
+        }
+      },
+      {
+        id: "actions",
+        header: () => <div className="text-right">Actions</div>,
+        cell: ({ row }) => {
+          const msg = row.original;
+          return (
+            <div className="flex items-center justify-end gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link to={`/messages/${msg.id}`}>
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive-foreground hover:bg-destructive/10"
+                    onClick={() => setDeleteId(msg.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
+              </Tooltip>
+            </div>
+          );
+        },
+        enableSorting: false
+      }
+    ],
+    [handleToggle]
+  );
+
+  const table = useReactTable({
+    data: messages,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  });
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Scheduled Messages</h1>
@@ -80,82 +242,26 @@ export function MessagesPage() {
         <Card>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Target</TableHead>
-                <TableHead>Message</TableHead>
-                <TableHead>Schedule</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} colSpan={header.colSpan}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
             </TableHeader>
             <TableBody>
-              {messages.map((msg) => (
-                <TableRow key={msg.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {msg.isGroup ? (
-                        <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className="font-medium">{msg.target}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-50">
-                    <span className="line-clamp-1 text-muted-foreground">{msg.message}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default text-sm text-foreground">
-                          {describeCron(msg.cronExpression)}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <code className="font-mono text-xs">{msg.cronExpression}</code>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={msg.enabled}
-                            onCheckedChange={() => handleToggle(msg.id, msg.enabled)}
-                          />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>{msg.enabled ? "Disable" : "Enable"}</TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" asChild>
-                            <Link to={`/messages/${msg.id}`}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive-foreground hover:bg-destructive/10"
-                            onClick={() => setDeleteId(msg.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TableCell>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
             </TableBody>

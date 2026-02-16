@@ -11,15 +11,15 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
 import { Textarea } from "../components/ui/textarea";
-import { useMessage, useMessages } from "../hooks/useMessages";
 import { api, type WhatsAppGroup } from "../lib/api";
+import { useMessagesStore } from "../stores/messages";
 
 export function MessageFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { message, loading: loadingMessage } = useMessage(id);
-  const { create, update } = useMessages();
+  const { create, update: updateMessage } = useMessagesStore();
 
+  const [loadingMessage, setLoadingMessage] = useState(Boolean(id));
   const [target, setTarget] = useState("");
   const [isGroup, setIsGroup] = useState(false);
   const [messageText, setMessageText] = useState("");
@@ -34,14 +34,20 @@ export function MessageFormPage() {
   const isEditing = Boolean(id);
 
   useEffect(() => {
-    if (message) {
-      setTarget(message.target);
-      setIsGroup(message.isGroup);
-      setMessageText(message.message);
-      setCronExpression(message.cronExpression);
-      setEnabled(message.enabled);
-    }
-  }, [message]);
+    if (!id) return;
+    setLoadingMessage(true);
+    api.messages.get(id).then((result) => {
+      if (result.success) {
+        const msg = result.data;
+        setTarget(msg.target);
+        setIsGroup(msg.isGroup);
+        setMessageText(msg.message);
+        setCronExpression(msg.cronExpression);
+        setEnabled(msg.enabled);
+      }
+      setLoadingMessage(false);
+    });
+  }, [id]);
 
   useEffect(() => {
     if (isGroup && groups.length === 0) {
@@ -92,7 +98,7 @@ export function MessageFormPage() {
 
     let err: string | null;
     if (isEditing && id) {
-      err = await update(id, data);
+      err = await updateMessage(id, data);
     } else {
       err = await create(data);
     }
@@ -101,7 +107,7 @@ export function MessageFormPage() {
       setError(err);
       setSaving(false);
     } else {
-      navigate("/messages");
+      navigate("/");
     }
   };
 
@@ -117,12 +123,7 @@ export function MessageFormPage() {
     <div className="mx-auto max-w-2xl pb-8">
       {/* Header */}
       <div className="mb-8 flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/messages")}
-          className="shrink-0"
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
@@ -286,7 +287,7 @@ export function MessageFormPage() {
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-1">
-          <Button type="button" variant="outline" onClick={() => navigate("/messages")}>
+          <Button type="button" variant="outline" onClick={() => navigate("/")}>
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>

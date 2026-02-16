@@ -1,9 +1,10 @@
 import { Loader2 } from "lucide-react";
 import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthStore } from "../stores/auth";
 
 export function ProtectedRoute() {
-  const { user, loading } = useAuth();
+  const user = useAuthStore((s) => s.user);
+  const loading = useAuthStore((s) => s.loading);
 
   if (loading) {
     return (
