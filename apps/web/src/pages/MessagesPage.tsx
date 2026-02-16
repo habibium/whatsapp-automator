@@ -47,7 +47,7 @@ import { useDeleteMessage, useMessages, useToggleMessage } from "../lib/queries"
 
 function TableSkeleton() {
   return (
-    <Card>
+    <Card className="py-0">
       <Table>
         <TableHeader>
           <TableRow>
@@ -116,11 +116,11 @@ export function MessagesPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 h-8"
+            className="h-8"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
             Target
-            <ArrowUpDown className="ml-1.5 h-3.5 w-3.5" />
+            <ArrowUpDown className="size-3.5" />
           </Button>
         ),
         cell: ({ row }) => {
@@ -128,9 +128,9 @@ export function MessagesPage() {
           return (
             <div className="flex items-center gap-2">
               {msg.isGroup ? (
-                <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <Users className="size-4 shrink-0 text-muted-foreground" />
               ) : (
-                <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <User className="size-4 shrink-0 text-muted-foreground" />
               )}
               <span className="font-medium">{msg.target}</span>
             </div>
@@ -157,7 +157,7 @@ export function MessagesPage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
             Schedule
-            <ArrowUpDown className="ml-1.5 h-3.5 w-3.5" />
+            <ArrowUpDown className="size-3.5" />
           </Button>
         ),
         cell: ({ row }) => (
@@ -184,7 +184,7 @@ export function MessagesPage() {
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             >
               Status
-              <ArrowUpDown className="ml-1.5 h-3.5 w-3.5" />
+              <ArrowUpDown className="size-3.5" />
             </Button>
           </div>
         ),
@@ -264,7 +264,7 @@ export function MessagesPage() {
         </div>
         <Button asChild>
           <Link to="/messages/new">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="size-4" />
             New Message
           </Link>
         </Button>
@@ -297,7 +297,7 @@ export function MessagesPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="py-0">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (

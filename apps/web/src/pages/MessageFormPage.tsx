@@ -185,7 +185,7 @@ export function MessageFormPage() {
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Send className="h-4 w-4 text-muted-foreground" />
+              <Send className="size-4 text-muted-foreground" />
               Recipient
             </CardTitle>
             <CardDescription>Choose who will receive this message</CardDescription>
@@ -204,7 +204,7 @@ export function MessageFormPage() {
                   }}
                   className="flex-1"
                 >
-                  <User className="mr-2 h-4 w-4" />
+                  <User className="size-4" />
                   Contact
                 </Button>
                 <Button
@@ -217,7 +217,7 @@ export function MessageFormPage() {
                   }}
                   className="flex-1"
                 >
-                  <Users className="mr-2 h-4 w-4" />
+                  <Users className="size-4" />
                   Group
                 </Button>
               </div>
@@ -327,11 +327,7 @@ export function MessageFormPage() {
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             {isEditing ? "Save Changes" : "Create Schedule"}
           </Button>
         </div>

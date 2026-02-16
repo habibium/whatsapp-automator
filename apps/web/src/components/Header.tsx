@@ -167,7 +167,7 @@ function UserMenu() {
           onClick={handleLogout}
           className="text-destructive-foreground focus:text-destructive-foreground"
         >
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut className="size-4 text-destructive-foreground" />
           Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
