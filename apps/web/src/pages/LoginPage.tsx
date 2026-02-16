@@ -1,7 +1,7 @@
+import { useMutation } from "@tanstack/react-query";
 import { CalendarClock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { Footer } from "../components/Footer";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { getErrorMessage } from "../lib/api";
 import { useAuthStore } from "../stores/auth";
 
 export function LoginPage() {
@@ -23,23 +24,26 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+
+  const loginMutation = useMutation({
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const err = await login(email, password);
+      if (err) {
+        throw new Error(err);
+      }
+    },
+    onSuccess: () => {
+      navigate("/");
+    }
+  });
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
 
-    const err = await login(email, password);
-    if (err) {
-      setError(err);
-      setLoading(false);
-    } else {
-      toast.success("Welcome back!");
-      navigate("/");
-    }
+    loginMutation.mutate({ email, password });
   };
+
+  const error = loginMutation.error ? getErrorMessage(loginMutation.error) : null;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -104,8 +108,8 @@ export function LoginPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+              <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                {loginMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
               </Button>
             </form>
           </CardContent>

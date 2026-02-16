@@ -1,7 +1,7 @@
+import { useMutation } from "@tanstack/react-query";
 import { CalendarClock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { Footer } from "../components/Footer";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { getErrorMessage } from "../lib/api";
 import { useAuthStore } from "../stores/auth";
 
 export function RegisterPage() {
@@ -25,34 +26,39 @@ export function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const registerMutation = useMutation({
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const err = await register(email, password);
+      if (err) {
+        throw new Error(err);
+      }
+    },
+    onSuccess: () => {
+      navigate("/");
+    }
+  });
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
-    setError(null);
+    setValidationError(null);
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setValidationError("Passwords do not match");
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setValidationError("Password must be at least 8 characters");
       return;
     }
 
-    setLoading(true);
-
-    const err = await register(email, password);
-    if (err) {
-      setError(err);
-      setLoading(false);
-    } else {
-      toast.success("Account created successfully!");
-      navigate("/");
-    }
+    registerMutation.mutate({ email, password });
   };
+
+  const error =
+    validationError ?? (registerMutation.error ? getErrorMessage(registerMutation.error) : null);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -149,8 +155,12 @@ export function RegisterPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
+              <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
+                {registerMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Create account"
+                )}
               </Button>
             </form>
           </CardContent>
