@@ -5,11 +5,15 @@ import {
   HelpCircle,
   Loader2,
   LogOut,
+  Monitor,
+  Moon,
   Smartphone,
+  Sun,
   Unplug,
   Wifi
 } from "lucide-react";
-import { useEffect } from "react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "../stores/auth";
@@ -19,12 +23,54 @@ import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "./ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+
+function ThemeSegmentedControl() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const currentTheme = mounted ? (theme ?? "system") : "system";
+
+  const options = [
+    { value: "light", icon: Sun, label: "Light" },
+    { value: "dark", icon: Moon, label: "Dark" },
+    { value: "system", icon: Monitor, label: "System" }
+  ] as const;
+
+  return (
+    <div className="mx-2 rounded-lg border border-border bg-muted/50">
+      <div className="grid grid-cols-3 gap-1">
+        {options.map((option) => {
+          const Icon = option.icon;
+          const isActive = currentTheme === option.value;
+
+          return (
+            <Button
+              key={option.value}
+              type="button"
+              size={"sm"}
+              aria-label={option.label}
+              onClick={() => setTheme(option.value)}
+              variant={isActive ? "default" : "ghost"}
+            >
+              <Icon className="size-4" />
+            </Button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function ConnectionStatusButton() {
   const { status, qrCode, loading, connect, disconnect } = useWhatsAppStore();
@@ -46,7 +92,7 @@ function ConnectionStatusButton() {
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           className="gap-2 text-sm font-medium"
           onClick={handleConnect}
@@ -159,17 +205,26 @@ function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="font-normal">
-          <p className="truncate text-sm font-medium">{user?.email}</p>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={handleLogout}
-          className="text-destructive-foreground focus:text-destructive-foreground"
-        >
-          <LogOut className="size-4 text-destructive-foreground" />
-          Log out
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Theme</DropdownMenuLabel>
+          <ThemeSegmentedControl />
+        </DropdownMenuGroup>
+
+        {/* <DropdownMenuSeparator className="mt-8" /> */}
+        <DropdownMenuGroup className="mt-4">
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="font-normal">
+            <p className="truncate text-sm font-medium">{user?.email}</p>
+          </DropdownMenuLabel>
+
+          <DropdownMenuItem
+            onClick={handleLogout}
+            className="text-destructive-foreground focus:text-destructive-foreground"
+          >
+            <LogOut className="size-4 text-destructive-foreground" />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

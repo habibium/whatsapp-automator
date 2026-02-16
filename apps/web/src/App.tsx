@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ThemeProvider } from "./components/ThemeProvider";
 import { Toaster } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { LoginPage } from "./pages/LoginPage";
@@ -30,23 +31,25 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <TooltipProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Layout />}>
-                <Route path="/" element={<MessagesPage />} />
-                <Route path="/messages/new" element={<MessageFormPage />} />
-                <Route path="/messages/:id" element={<MessageFormPage />} />
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+        <BrowserRouter>
+          <TooltipProvider>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route path="/" element={<MessagesPage />} />
+                  <Route path="/messages/new" element={<MessageFormPage />} />
+                  <Route path="/messages/:id" element={<MessageFormPage />} />
+                </Route>
               </Route>
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </TooltipProvider>
-        <Toaster position="bottom-center" />
-      </BrowserRouter>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </TooltipProvider>
+          <Toaster position="bottom-center" />
+        </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
