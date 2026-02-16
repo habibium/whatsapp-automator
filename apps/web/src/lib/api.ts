@@ -64,6 +64,17 @@ export const whatsappApi = {
   groups: () => apiClient.get<WhatsAppGroup[]>("/whatsapp/groups").then((r) => r.data)
 };
 
+// ── Server Info API ─────────────────────────────────────────────────
+
+export type ServerTimezone = {
+  timezone: string;
+  offset: string;
+};
+
+export const serverApi = {
+  timezone: () => apiClient.get<ServerTimezone>("/timezone").then((r) => r.data)
+};
+
 // ── Messages API ───────────────────────────────────────────────────
 
 export const messagesApi = {

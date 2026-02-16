@@ -4,6 +4,7 @@ import {
   type CreateMessageInput,
   getErrorMessage,
   messagesApi,
+  serverApi,
   type UpdateMessageInput,
   whatsappApi
 } from "./api";
@@ -17,6 +18,9 @@ export const queryKeys = {
   },
   whatsapp: {
     groups: ["whatsapp", "groups"] as const
+  },
+  server: {
+    timezone: ["server", "timezone"] as const
   }
 } as const;
 
@@ -112,6 +116,17 @@ export function useToggleMessage() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.messages.all });
     }
+  });
+}
+
+// ── Server Info ────────────────────────────────────────────────────
+
+export function useServerTimezone() {
+  return useQuery({
+    queryKey: queryKeys.server.timezone,
+    queryFn: serverApi.timezone,
+    staleTime: 60 * 60 * 1000, // 1 hour
+    retry: 1
   });
 }
 

@@ -1,85 +1,141 @@
-import { Calendar, Clock, Info, Repeat } from "lucide-react";
+import { format } from "date-fns";
+import { CalendarDays, Clock, Code2, Globe, Info, Repeat, Timer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
+import { Calendar } from "./ui/calendar";
+import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue
+} from "./ui/select";
+import { Separator } from "./ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
+// ─── Types ──────────────────────────────────────────────────────────
 type CronScheduleBuilderProps = {
   value: string;
   onChange: (value: string) => void;
+  /** Server timezone info e.g. { timezone: "Asia/Dhaka", offset: "GMT+6" } */
+  serverTimezone?: { timezone: string; offset: string } | null | undefined;
 };
+
+type ScheduleMode = "once" | "recurring";
 
 type Frequency =
   | "every-second"
   | "every-n-seconds"
   | "every-minute"
   | "every-n-minutes"
-  | "hourly"
+  | "every-n-hours"
   | "daily"
+  | "every-n-days"
   | "weekly"
-  | "monthly";
+  | "specific-weekdays"
+  | "monthly"
+  | "every-n-months";
 
-const DAYS_OF_WEEK = [
-  { value: "0", label: "Sunday" },
-  { value: "1", label: "Monday" },
-  { value: "2", label: "Tuesday" },
-  { value: "3", label: "Wednesday" },
-  { value: "4", label: "Thursday" },
-  { value: "5", label: "Friday" },
-  { value: "6", label: "Saturday" }
+// ─── Constants ──────────────────────────────────────────────────────
+const WEEKDAYS = [
+  { value: "1", label: "Mon" },
+  { value: "2", label: "Tue" },
+  { value: "3", label: "Wed" },
+  { value: "4", label: "Thu" },
+  { value: "5", label: "Fri" },
+  { value: "6", label: "Sat" },
+  { value: "0", label: "Sun" }
 ] as const;
 
-const MINUTE_INTERVALS = [
-  { value: "5", label: "5 minutes" },
-  { value: "10", label: "10 minutes" },
-  { value: "15", label: "15 minutes" },
-  { value: "20", label: "20 minutes" },
-  { value: "30", label: "30 minutes" }
-] as const;
+// ─── Cron Builder ───────────────────────────────────────────────────
+function buildCron(
+  frequency: Frequency,
+  minute: string,
+  hour: string,
+  dayOfMonth: string,
+  weekdays: string[],
+  intervalN: string
+): string {
+  const m = minute || "0";
+  const h = hour || "9";
+  const dom = dayOfMonth || "1";
+  const n = intervalN || "2";
 
-const SECOND_INTERVALS = [
-  { value: "2", label: "2 seconds" },
-  { value: "5", label: "5 seconds" },
-  { value: "10", label: "10 seconds" },
-  { value: "15", label: "15 seconds" },
-  { value: "30", label: "30 seconds" }
-] as const;
+  switch (frequency) {
+    case "every-second":
+      return "* * * * * *";
+    case "every-n-seconds":
+      return `*/${n} * * * * *`;
+    case "every-minute":
+      return "* * * * *";
+    case "every-n-minutes":
+      return `*/${n} * * * *`;
+    case "every-n-hours":
+      return `${m} */${n} * * *`;
+    case "daily":
+      return `${m} ${h} * * *`;
+    case "every-n-days":
+      return `${m} ${h} */${n} * *`;
+    case "weekly":
+      return `${m} ${h} * * ${weekdays[0] ?? "1"}`;
+    case "specific-weekdays": {
+      const days = weekdays.length > 0 ? weekdays.sort().join(",") : "1";
+      return `${m} ${h} * * ${days}`;
+    }
+    case "monthly":
+      return `${m} ${h} ${dom} * *`;
+    case "every-n-months":
+      return `${m} ${h} ${dom} */${n} *`;
+  }
+}
 
-function parseCronToState(cron: string): {
+function buildOnceCron(date: Date | undefined, time: string): string {
+  if (!date || !time) return "";
+  const month = String(date.getMonth() + 1);
+  const day = String(date.getDate());
+  const [hours, minutes, seconds] = time.split(":");
+  const h = String(Number.parseInt(hours ?? "0", 10));
+  const m = String(Number.parseInt(minutes ?? "0", 10));
+  const sec = String(Number.parseInt(seconds ?? "0", 10));
+  return `${sec} ${m} ${h} ${day} ${month} *`;
+}
+
+// ─── Cron Parser ────────────────────────────────────────────────────
+interface ParsedState {
+  scheduleMode: ScheduleMode;
   frequency: Frequency;
-  second: string;
   minute: string;
   hour: string;
   dayOfMonth: string;
-  dayOfWeek: string;
-  minuteInterval: string;
-  secondInterval: string;
-} {
-  if (!cron) {
-    return {
-      frequency: "daily",
-      second: "0",
-      minute: "0",
-      hour: "9",
-      dayOfMonth: "1",
-      dayOfWeek: "1",
-      minuteInterval: "5",
-      secondInterval: "5"
-    };
-  }
+  weekdays: string[];
+  intervalN: string;
+  onceDate: Date | undefined;
+  onceTime: string;
+}
+
+function parseCronToState(cron: string): ParsedState {
+  const defaults: ParsedState = {
+    scheduleMode: "recurring",
+    frequency: "daily",
+    minute: "0",
+    hour: "9",
+    dayOfMonth: "1",
+    weekdays: ["1"],
+    intervalN: "2",
+    onceDate: undefined,
+    onceTime: "09:00:00"
+  };
+
+  if (!cron) return defaults;
 
   const parts = cron.trim().split(/\s+/);
-  if (parts.length !== 5 && parts.length !== 6) {
-    return {
-      frequency: "daily",
-      second: "0",
-      minute: "0",
-      hour: "9",
-      dayOfMonth: "1",
-      dayOfWeek: "1",
-      minuteInterval: "5",
-      secondInterval: "5"
-    };
-  }
+  if (parts.length !== 5 && parts.length !== 6) return defaults;
 
   const [second, minute, hour, dayOfMonth, month, dayOfWeek] =
     parts.length === 6 ? parts : ["0", ...parts];
@@ -93,16 +149,7 @@ function parseCronToState(cron: string): {
     month === "*" &&
     dayOfWeek === "*"
   ) {
-    return {
-      frequency: "every-second",
-      second: "0",
-      minute: "0",
-      hour: "0",
-      dayOfMonth: "1",
-      dayOfWeek: "1",
-      minuteInterval: "5",
-      secondInterval: "5"
-    };
+    return { ...defaults, frequency: "every-second" };
   }
 
   // Every N seconds
@@ -114,17 +161,7 @@ function parseCronToState(cron: string): {
     month === "*" &&
     dayOfWeek === "*"
   ) {
-    const secondInterval = second.slice(2);
-    return {
-      frequency: "every-n-seconds",
-      second: "0",
-      minute: "0",
-      hour: "0",
-      dayOfMonth: "1",
-      dayOfWeek: "1",
-      minuteInterval: "5",
-      secondInterval
-    };
+    return { ...defaults, frequency: "every-n-seconds", intervalN: second.slice(2) };
   }
 
   // Every minute
@@ -136,16 +173,7 @@ function parseCronToState(cron: string): {
     month === "*" &&
     dayOfWeek === "*"
   ) {
-    return {
-      frequency: "every-minute",
-      second: "0",
-      minute: "0",
-      hour: "0",
-      dayOfMonth: "1",
-      dayOfWeek: "1",
-      minuteInterval: "5",
-      secondInterval: "5"
-    };
+    return { ...defaults, frequency: "every-minute" };
   }
 
   // Every N minutes
@@ -157,110 +185,152 @@ function parseCronToState(cron: string): {
     month === "*" &&
     dayOfWeek === "*"
   ) {
-    const minuteInterval = minute.slice(2);
-    return {
-      frequency: "every-n-minutes",
-      second: "0",
-      minute: "0",
-      hour: "0",
-      dayOfMonth: "1",
-      dayOfWeek: "1",
-      minuteInterval,
-      secondInterval: "5"
-    };
+    return { ...defaults, frequency: "every-n-minutes", intervalN: minute.slice(2) };
   }
 
-  // Hourly
+  // Every N hours
   if (
     (second === "0" || second === "*") &&
-    hour === "*" &&
+    hour?.startsWith("*/") &&
     dayOfMonth === "*" &&
     month === "*" &&
     dayOfWeek === "*"
   ) {
     return {
-      frequency: "hourly",
-      second,
+      ...defaults,
+      frequency: "every-n-hours",
       minute: minute ?? "0",
-      hour: "0",
-      dayOfMonth: "1",
-      dayOfWeek: "1",
-      minuteInterval: "5",
-      secondInterval: "5"
+      intervalN: hour.slice(2)
     };
   }
 
-  // Weekly
-  if ((second === "0" || second === "*") && dayOfMonth === "*" && dayOfWeek !== "*") {
+  // Specific month + day → "once" schedule
+  if (
+    month !== "*" &&
+    !month?.startsWith("*/") &&
+    dayOfMonth !== "*" &&
+    !dayOfMonth?.startsWith("*/") &&
+    dayOfWeek === "*"
+  ) {
+    const h = Number.parseInt(hour ?? "0", 10);
+    const m = Number.parseInt(minute ?? "0", 10);
+    const s = Number.parseInt(second ?? "0", 10);
+    const mo = Number.parseInt(month ?? "1", 10);
+    const d = Number.parseInt(dayOfMonth ?? "1", 10);
+    const now = new Date();
+    const year = now.getFullYear();
+    const onceDate = new Date(year, mo - 1, d);
+    const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return { ...defaults, scheduleMode: "once", onceDate, onceTime: timeStr };
+  }
+
+  // Every N days
+  if (
+    (second === "0" || second === "*") &&
+    dayOfMonth?.startsWith("*/") &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
     return {
-      frequency: "weekly",
-      second,
+      ...defaults,
+      frequency: "every-n-days",
       minute: minute ?? "0",
       hour: hour ?? "9",
-      dayOfMonth: "1",
-      dayOfWeek: dayOfWeek ?? "1",
-      minuteInterval: "5",
-      secondInterval: "5"
+      intervalN: dayOfMonth.slice(2)
+    };
+  }
+
+  // Specific weekdays (multiple)
+  if (
+    (second === "0" || second === "*") &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek !== "*" &&
+    dayOfWeek?.includes(",")
+  ) {
+    return {
+      ...defaults,
+      frequency: "specific-weekdays",
+      minute: minute ?? "0",
+      hour: hour ?? "9",
+      weekdays: dayOfWeek.split(",").map((d) => d.trim())
+    };
+  }
+
+  // Weekly (single day)
+  if (
+    (second === "0" || second === "*") &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek !== "*"
+  ) {
+    return {
+      ...defaults,
+      frequency: "weekly",
+      minute: minute ?? "0",
+      hour: hour ?? "9",
+      weekdays: [dayOfWeek]
+    };
+  }
+
+  // Every N months
+  if (
+    (second === "0" || second === "*") &&
+    dayOfMonth !== "*" &&
+    month?.startsWith("*/") &&
+    dayOfWeek === "*"
+  ) {
+    return {
+      ...defaults,
+      frequency: "every-n-months",
+      minute: minute ?? "0",
+      hour: hour ?? "9",
+      dayOfMonth: dayOfMonth ?? "1",
+      intervalN: month.slice(2)
     };
   }
 
   // Monthly
-  if ((second === "0" || second === "*") && dayOfMonth !== "*" && dayOfWeek === "*") {
+  if (
+    (second === "0" || second === "*") &&
+    dayOfMonth !== "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
     return {
+      ...defaults,
       frequency: "monthly",
-      second,
       minute: minute ?? "0",
       hour: hour ?? "9",
-      dayOfMonth: dayOfMonth ?? "1",
-      dayOfWeek: "1",
-      minuteInterval: "5",
-      secondInterval: "5"
+      dayOfMonth: dayOfMonth ?? "1"
     };
   }
 
   // Daily (default)
   return {
+    ...defaults,
     frequency: "daily",
-    second,
     minute: minute ?? "0",
-    hour: hour ?? "9",
-    dayOfMonth: "1",
-    dayOfWeek: "1",
-    minuteInterval: "5",
-    secondInterval: "5"
+    hour: hour ?? "9"
   };
 }
 
-function buildCron(
-  frequency: Frequency,
-  minute: string,
-  hour: string,
-  dayOfMonth: string,
-  dayOfWeek: string,
-  minuteInterval: string,
-  secondInterval: string
-): string {
-  switch (frequency) {
-    case "every-second":
-      return "* * * * * *";
-    case "every-n-seconds":
-      return `*/${secondInterval} * * * * *`;
-    case "every-minute":
-      return "* * * * *";
-    case "every-n-minutes":
-      return `*/${minuteInterval} * * * *`;
-    case "hourly":
-      return `${minute} * * * *`;
-    case "daily":
-      return `${minute} ${hour} * * *`;
-    case "weekly":
-      return `${minute} ${hour} * * ${dayOfWeek}`;
-    case "monthly":
-      return `${minute} ${hour} ${dayOfMonth} * *`;
-  }
-}
+// ─── Describe Cron ──────────────────────────────────────────────────
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+];
 
-/** Describe a cron expression in plain English */
 export function describeCron(cron: string): string {
   if (!cron) return "No schedule set";
   const parts = cron.trim().split(/\s+/);
@@ -269,7 +339,6 @@ export function describeCron(cron: string): string {
   const [second, minute, hour, dayOfMonth, month, dayOfWeek] =
     parts.length === 6 ? parts : ["0", ...parts];
 
-  // Every second
   if (
     second === "*" &&
     minute === "*" &&
@@ -281,7 +350,6 @@ export function describeCron(cron: string): string {
     return "Every second";
   }
 
-  // Every N seconds
   if (
     second?.startsWith("*/") &&
     minute === "*" &&
@@ -290,11 +358,9 @@ export function describeCron(cron: string): string {
     month === "*" &&
     dayOfWeek === "*"
   ) {
-    const n = second.slice(2);
-    return `Every ${n} seconds`;
+    return `Every ${second.slice(2)} seconds`;
   }
 
-  // Every minute
   if (
     (second === "0" || second === "*") &&
     minute === "*" &&
@@ -306,7 +372,6 @@ export function describeCron(cron: string): string {
     return "Every minute";
   }
 
-  // Every N minutes
   if (
     (second === "0" || second === "*") &&
     minute?.startsWith("*/") &&
@@ -315,11 +380,20 @@ export function describeCron(cron: string): string {
     month === "*" &&
     dayOfWeek === "*"
   ) {
-    const n = minute.slice(2);
-    return `Every ${n} minutes`;
+    return `Every ${minute.slice(2)} minutes`;
   }
 
-  // Hourly
+  if (
+    (second === "0" || second === "*") &&
+    hour?.startsWith("*/") &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    const m = Number.parseInt(minute ?? "0", 10);
+    return `Every ${hour.slice(2)} hours${m > 0 ? ` at minute :${String(m).padStart(2, "0")}` : ""}`;
+  }
+
   if (
     (second === "0" || second === "*") &&
     hour === "*" &&
@@ -327,13 +401,8 @@ export function describeCron(cron: string): string {
     month === "*" &&
     dayOfWeek === "*"
   ) {
-    const min = Number.parseInt(minute ?? "0", 10);
-    const sec = Number.parseInt(second ?? "0", 10);
-    const minStr =
-      min === 0 && sec === 0
-        ? "on the hour"
-        : `at ${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
-    return `Every hour ${minStr}`;
+    const m = Number.parseInt(minute ?? "0", 10);
+    return m === 0 ? "Every hour on the hour" : `Every hour at :${String(m).padStart(2, "0")}`;
   }
 
   const s = Number.parseInt(second ?? "0", 10);
@@ -341,32 +410,47 @@ export function describeCron(cron: string): string {
   const m = Number.parseInt(minute ?? "0", 10);
   const timeStr = formatTime(h, m, s);
 
-  // Weekly
+  if (
+    month !== "*" &&
+    !month?.startsWith("*/") &&
+    dayOfMonth !== "*" &&
+    !dayOfMonth?.startsWith("*/") &&
+    dayOfWeek === "*"
+  ) {
+    const mo = Number.parseInt(month ?? "1", 10);
+    const d = Number.parseInt(dayOfMonth ?? "1", 10);
+    const monthName = MONTH_NAMES[mo - 1] ?? month;
+    return `Once on ${monthName} ${d} at ${timeStr}`;
+  }
+
+  if (dayOfMonth?.startsWith("*/") && month === "*" && dayOfWeek === "*") {
+    return `Every ${dayOfMonth.slice(2)} days at ${timeStr}`;
+  }
+
+  if (dayOfMonth === "*" && dayOfWeek !== "*" && month === "*" && dayOfWeek?.includes(",")) {
+    const days = dayOfWeek.split(",").map((d) => getDayName(d.trim()));
+    return `Every ${days.join(", ")} at ${timeStr}`;
+  }
+
   if (dayOfMonth === "*" && dayOfWeek !== "*" && month === "*") {
     const dayName = getDayName(dayOfWeek ?? "0");
-    // Handle day ranges
     if (dayOfWeek?.includes("-")) {
       const [start, end] = dayOfWeek.split("-");
-      const startName = getDayName(start ?? "0");
-      const endName = getDayName(end ?? "0");
-      return `${startName} through ${endName} at ${timeStr}`;
-    }
-    // Handle multiple days
-    if (dayOfWeek?.includes(",")) {
-      const days = dayOfWeek.split(",").map((d) => getDayName(d.trim()));
-      return `Every ${days.join(", ")} at ${timeStr}`;
+      return `${getDayName(start ?? "0")} through ${getDayName(end ?? "0")} at ${timeStr}`;
     }
     return `Every ${dayName} at ${timeStr}`;
   }
 
-  // Monthly
-  if (dayOfMonth !== "*" && dayOfWeek === "*" && month === "*") {
-    const day = Number.parseInt(dayOfMonth ?? "1", 10);
-    const ordinal = getOrdinal(day);
-    return `Monthly on the ${ordinal} at ${timeStr}`;
+  if (dayOfMonth !== "*" && month?.startsWith("*/") && dayOfWeek === "*") {
+    const d = Number.parseInt(dayOfMonth ?? "1", 10);
+    return `Every ${month.slice(2)} months on the ${getOrdinal(d)} at ${timeStr}`;
   }
 
-  // Daily
+  if (dayOfMonth !== "*" && dayOfWeek === "*" && month === "*") {
+    const d = Number.parseInt(dayOfMonth ?? "1", 10);
+    return `Monthly on the ${getOrdinal(d)} at ${timeStr}`;
+  }
+
   if (dayOfMonth === "*" && dayOfWeek === "*" && month === "*") {
     return `Every day at ${timeStr}`;
   }
@@ -374,11 +458,12 @@ export function describeCron(cron: string): string {
   return `Runs at: ${cron}`;
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────
 function formatTime(hour: number, minute: number, second = 0): string {
   const period = hour >= 12 ? "PM" : "AM";
   const h = hour % 12 || 12;
-  const m = minute.toString().padStart(2, "0");
-  const s = second.toString().padStart(2, "0");
+  const m = String(minute).padStart(2, "0");
+  const s = String(second).padStart(2, "0");
   return second > 0 ? `${h}:${m}:${s} ${period}` : `${h}:${m} ${period}`;
 }
 
@@ -402,257 +487,658 @@ function getOrdinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProps) {
+function isValidCron(cron: string): boolean {
+  if (!cron) return false;
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5 && parts.length !== 6) return false;
+  const pattern = /^(\*|\d+|\*\/\d+|\d+(-\d+)?(,\d+(-\d+)?)*)$/;
+  return parts.every((p) => pattern.test(p));
+}
+
+function clampN(val: string, min: number, max: number): string {
+  const n = Number.parseInt(val, 10);
+  if (Number.isNaN(n)) return String(min);
+  return String(Math.max(min, Math.min(max, n)));
+}
+
+// ─── Sub-Components ─────────────────────────────────────────────────
+
+function DatePicker({
+  value,
+  onChange
+}: {
+  value: Date | undefined;
+  onChange: (d: Date | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal",
+            !value && "text-muted-foreground"
+          )}
+        >
+          <CalendarDays className="h-4 w-4" />
+          {value ? format(value, "PPP") : "Pick a date"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={value}
+          onSelect={(d) => {
+            onChange(d);
+            setOpen(false);
+          }}
+          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+          className="rounded-lg border"
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function HourSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="flex-1">
+        <SelectValue placeholder="Hour" />
+      </SelectTrigger>
+      <SelectContent>
+        {Array.from({ length: 24 }, (_, i) => {
+          const period = i >= 12 ? "PM" : "AM";
+          const h12 = i % 12 || 12;
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static hour list
+            <SelectItem key={i} value={String(i)}>
+              {h12} {period}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function MinuteSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="flex-1">
+        <SelectValue placeholder="Minute" />
+      </SelectTrigger>
+      <SelectContent>
+        {Array.from({ length: 60 }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static minute list
+          <SelectItem key={i} value={String(i)}>
+            :{String(i).padStart(2, "0")}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function IntervalInput({
+  value,
+  onChange,
+  unit,
+  min = 2,
+  max = 60
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  unit: string;
+  min?: number;
+  max?: number;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">Interval</Label>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground shrink-0">Every</span>
+        <Input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(clampN(e.target.value, min, max))}
+          className="w-20 text-center"
+        />
+        <span className="text-sm text-muted-foreground shrink-0">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function WeekdaySelector({
+  value,
+  onChange
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium flex items-center gap-2">
+        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        Days
+      </Label>
+      <ToggleGroup
+        type="multiple"
+        value={value}
+        onValueChange={(val) => {
+          if (val.length > 0) onChange(val);
+        }}
+        className="flex flex-wrap gap-1.5 justify-start"
+      >
+        {WEEKDAYS.map((day) => (
+          <ToggleGroupItem
+            key={day.value}
+            value={day.value}
+            size="sm"
+            variant="outline"
+            className="h-9 w-12 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary"
+          >
+            {day.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+}
+
+function DayOfMonthSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium flex items-center gap-2">
+        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        Day of month
+      </Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: 31 }, (_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static day list
+            <SelectItem key={i + 1} value={String(i + 1)}>
+              {getOrdinal(i + 1)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function CronSyntaxReference() {
+  return (
+    <div className="rounded-lg bg-muted/50 border border-border/50 px-3.5 py-3 space-y-3">
+      <p className="text-xs font-medium text-foreground/70">Cron Syntax</p>
+      <pre className="text-[11px] leading-relaxed text-muted-foreground font-mono whitespace-pre overflow-x-auto">
+        {` ┌────────────── second (optional)
+ │ ┌──────────── minute
+ │ │ ┌────────── hour
+ │ │ │ ┌──────── day of month
+ │ │ │ │ ┌────── month
+ │ │ │ │ │ ┌──── day of week
+ │ │ │ │ │ │
+ * * * * * *`}
+      </pre>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="border-b border-border/50">
+              <th className="text-left py-1 pr-4 font-medium text-foreground/70">Field</th>
+              <th className="text-left py-1 font-medium text-foreground/70">Allowed values</th>
+            </tr>
+          </thead>
+          <tbody className="text-muted-foreground font-mono">
+            <tr className="border-b border-border/30">
+              <td className="py-1 pr-4">second</td>
+              <td className="py-1">0-59</td>
+            </tr>
+            <tr className="border-b border-border/30">
+              <td className="py-1 pr-4">minute</td>
+              <td className="py-1">0-59</td>
+            </tr>
+            <tr className="border-b border-border/30">
+              <td className="py-1 pr-4">hour</td>
+              <td className="py-1">0-23</td>
+            </tr>
+            <tr className="border-b border-border/30">
+              <td className="py-1 pr-4">day of month</td>
+              <td className="py-1">1-31</td>
+            </tr>
+            <tr className="border-b border-border/30">
+              <td className="py-1 pr-4">month</td>
+              <td className="py-1">1-12 (or names)</td>
+            </tr>
+            <tr>
+              <td className="py-1 pr-4">day of week</td>
+              <td className="py-1">0-7 (or names, 0 or 7 are sunday)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Grouped Frequency Select ───────────────────────────────────────
+function FrequencySelect({
+  value,
+  onChange
+}: {
+  value: Frequency;
+  onChange: (v: Frequency) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as Frequency)}>
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>Seconds</SelectLabel>
+          <SelectItem value="every-second">Every second</SelectItem>
+          <SelectItem value="every-n-seconds">Every N seconds</SelectItem>
+        </SelectGroup>
+        <SelectGroup>
+          <SelectLabel>Minutes</SelectLabel>
+          <SelectItem value="every-minute">Every minute</SelectItem>
+          <SelectItem value="every-n-minutes">Every N minutes</SelectItem>
+        </SelectGroup>
+        <SelectGroup>
+          <SelectLabel>Hours</SelectLabel>
+          <SelectItem value="every-n-hours">Every N hours</SelectItem>
+        </SelectGroup>
+        <SelectGroup>
+          <SelectLabel>Days</SelectLabel>
+          <SelectItem value="daily">Daily</SelectItem>
+          <SelectItem value="every-n-days">Every N days</SelectItem>
+        </SelectGroup>
+        <SelectGroup>
+          <SelectLabel>Weeks</SelectLabel>
+          <SelectItem value="weekly">Weekly</SelectItem>
+          <SelectItem value="specific-weekdays">Specific days of week</SelectItem>
+        </SelectGroup>
+        <SelectGroup>
+          <SelectLabel>Months</SelectLabel>
+          <SelectItem value="monthly">Monthly</SelectItem>
+          <SelectItem value="every-n-months">Every N months</SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────
+
+export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronScheduleBuilderProps) {
   const parsed = useMemo(() => parseCronToState(value), [value]);
 
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(parsed.scheduleMode);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualCron, setManualCron] = useState(value);
+
+  // Once mode
+  const [onceDate, setOnceDate] = useState<Date | undefined>(parsed.onceDate);
+  const [onceTime, setOnceTime] = useState(parsed.onceTime);
+
+  // Recurring mode
   const [frequency, setFrequency] = useState<Frequency>(parsed.frequency);
   const [minute, setMinute] = useState(parsed.minute);
   const [hour, setHour] = useState(parsed.hour);
   const [dayOfMonth, setDayOfMonth] = useState(parsed.dayOfMonth);
-  const [dayOfWeek, setDayOfWeek] = useState(parsed.dayOfWeek);
-  const [minuteInterval, setMinuteInterval] = useState(parsed.minuteInterval);
-  const [secondInterval, setSecondInterval] = useState(parsed.secondInterval);
+  const [weekdays, setWeekdays] = useState<string[]>(parsed.weekdays);
+  const [intervalN, setIntervalN] = useState(parsed.intervalN);
 
-  // Sync local state when the external cron value changes (e.g. when editing existing message)
+  // Sync from external value changes (edit mode)
   useEffect(() => {
     const p = parseCronToState(value);
+    setScheduleMode(p.scheduleMode);
     setFrequency(p.frequency);
     setMinute(p.minute);
     setHour(p.hour);
     setDayOfMonth(p.dayOfMonth);
-    setDayOfWeek(p.dayOfWeek);
-    setMinuteInterval(p.minuteInterval);
-    setSecondInterval(p.secondInterval);
+    setWeekdays(p.weekdays);
+    setIntervalN(p.intervalN);
+    setOnceDate(p.onceDate);
+    setOnceTime(p.onceTime);
+    setManualCron(value);
   }, [value]);
 
-  const updateCron = useCallback(
-    (
-      f: Frequency,
-      m: string,
-      h: string,
-      dom: string,
-      dow: string,
-      minuteIntv: string,
-      secondIntv: string
-    ) => {
-      const newCron = buildCron(f, m, h, dom, dow, minuteIntv, secondIntv);
-      if (newCron !== value) {
+  const emitCron = useCallback(
+    (newCron: string) => {
+      if (newCron && newCron !== value) {
         onChange(newCron);
       }
     },
     [onChange, value]
   );
 
-  const handleFrequencyChange = (f: Frequency) => {
+  const emitRecurring = useCallback(
+    (f: Frequency, m: string, h: string, dom: string, wd: string[], n: string) => {
+      emitCron(buildCron(f, m, h, dom, wd, n));
+    },
+    [emitCron]
+  );
+
+  const emitOnce = useCallback(
+    (date: Date | undefined, time: string) => {
+      const cron = buildOnceCron(date, time);
+      if (cron) emitCron(cron);
+    },
+    [emitCron]
+  );
+
+  // ── Handlers ──
+  const handleScheduleMode = (mode: ScheduleMode) => {
+    setScheduleMode(mode);
+    setManualMode(false);
+    if (mode === "once") {
+      const d = onceDate || new Date();
+      const t = onceTime || "09:00:00";
+      setOnceDate(d);
+      setOnceTime(t);
+      emitOnce(d, t);
+    } else {
+      emitRecurring(frequency, minute, hour, dayOfMonth, weekdays, intervalN);
+    }
+  };
+
+  const handleFrequency = (f: Frequency) => {
     setFrequency(f);
-    updateCron(f, minute, hour, dayOfMonth, dayOfWeek, minuteInterval, secondInterval);
+    emitRecurring(f, minute, hour, dayOfMonth, weekdays, intervalN);
   };
 
-  const handleMinuteChange = (m: string) => {
+  const handleMinute = (m: string) => {
     setMinute(m);
-    updateCron(frequency, m, hour, dayOfMonth, dayOfWeek, minuteInterval, secondInterval);
+    emitRecurring(frequency, m, hour, dayOfMonth, weekdays, intervalN);
   };
 
-  const handleHourChange = (h: string) => {
+  const handleHour = (h: string) => {
     setHour(h);
-    updateCron(frequency, minute, h, dayOfMonth, dayOfWeek, minuteInterval, secondInterval);
+    emitRecurring(frequency, minute, h, dayOfMonth, weekdays, intervalN);
   };
 
-  const handleDayOfMonthChange = (d: string) => {
+  const handleDayOfMonth = (d: string) => {
     setDayOfMonth(d);
-    updateCron(frequency, minute, hour, d, dayOfWeek, minuteInterval, secondInterval);
+    emitRecurring(frequency, minute, hour, d, weekdays, intervalN);
   };
 
-  const handleDayOfWeekChange = (d: string) => {
-    setDayOfWeek(d);
-    updateCron(frequency, minute, hour, dayOfMonth, d, minuteInterval, secondInterval);
+  const handleWeekdays = (wd: string[]) => {
+    setWeekdays(wd);
+    emitRecurring(frequency, minute, hour, dayOfMonth, wd, intervalN);
   };
 
-  const handleMinuteIntervalChange = (intv: string) => {
-    setMinuteInterval(intv);
-    updateCron(frequency, minute, hour, dayOfMonth, dayOfWeek, intv, secondInterval);
+  const handleIntervalN = (n: string) => {
+    setIntervalN(n);
+    emitRecurring(frequency, minute, hour, dayOfMonth, weekdays, n);
   };
 
-  const handleSecondIntervalChange = (intv: string) => {
-    setSecondInterval(intv);
-    updateCron(frequency, minute, hour, dayOfMonth, dayOfWeek, minuteInterval, intv);
+  const handleOnceDate = (d: Date | undefined) => {
+    setOnceDate(d);
+    emitOnce(d, onceTime);
+  };
+
+  const handleOnceTime = (t: string) => {
+    setOnceTime(t);
+    emitOnce(onceDate, t);
+  };
+
+  const handleManualCron = (c: string) => {
+    setManualCron(c);
+    if (isValidCron(c)) {
+      emitCron(c);
+    }
+  };
+
+  // ── Visibility flags ──
+  const showTime = [
+    "every-n-hours",
+    "daily",
+    "every-n-days",
+    "weekly",
+    "specific-weekdays",
+    "monthly",
+    "every-n-months"
+  ].includes(frequency);
+  const showHour = [
+    "daily",
+    "every-n-days",
+    "weekly",
+    "specific-weekdays",
+    "monthly",
+    "every-n-months"
+  ].includes(frequency);
+  const showIntervalN = [
+    "every-n-seconds",
+    "every-n-minutes",
+    "every-n-hours",
+    "every-n-days",
+    "every-n-months"
+  ].includes(frequency);
+  const showWeekdays = frequency === "specific-weekdays";
+  const showWeekdaySingle = frequency === "weekly";
+  const showDayOfMonth = frequency === "monthly" || frequency === "every-n-months";
+
+  const intervalUnit: Record<string, string> = {
+    "every-n-seconds": "seconds",
+    "every-n-minutes": "minutes",
+    "every-n-hours": "hours",
+    "every-n-days": "days",
+    "every-n-months": "months"
+  };
+
+  const intervalMax: Record<string, number> = {
+    "every-n-seconds": 59,
+    "every-n-minutes": 59,
+    "every-n-hours": 23,
+    "every-n-days": 31,
+    "every-n-months": 12
   };
 
   const description = describeCron(value);
+  const manualValid = isValidCron(manualCron);
 
-  const showMinute =
-    frequency === "hourly" ||
-    frequency === "daily" ||
-    frequency === "weekly" ||
-    frequency === "monthly";
-  const showHour = frequency === "daily" || frequency === "weekly" || frequency === "monthly";
-  const showDayOfWeek = frequency === "weekly";
-  const showDayOfMonth = frequency === "monthly";
-  const showMinuteInterval = frequency === "every-n-minutes";
-  const showSecondInterval = frequency === "every-n-seconds";
+  const tzLabel = serverTimezone ? `${serverTimezone.timezone} (${serverTimezone.offset})` : null;
 
   return (
-    <div className="space-y-4">
-      {/* Frequency selector */}
+    <div className="space-y-5">
+      {/* ── Mode Toggle: Once / Recurring ── */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <Repeat className="h-4 w-4 text-muted-foreground" />
-          Frequency
-        </Label>
-        <Select value={frequency} onValueChange={(v) => handleFrequencyChange(v as Frequency)}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="every-second">Every second</SelectItem>
-            <SelectItem value="every-n-seconds">Every N seconds</SelectItem>
-            <SelectItem value="every-minute">Every minute</SelectItem>
-            <SelectItem value="every-n-minutes">Every N minutes</SelectItem>
-            <SelectItem value="hourly">Hourly</SelectItem>
-            <SelectItem value="daily">Daily</SelectItem>
-            <SelectItem value="weekly">Weekly</SelectItem>
-            <SelectItem value="monthly">Monthly</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label className="text-sm font-medium">Schedule type</Label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={scheduleMode === "once" ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleScheduleMode("once")}
+            className="flex-1"
+          >
+            <Timer className="size-4" />
+            Once
+          </Button>
+          <Button
+            type="button"
+            variant={scheduleMode === "recurring" ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleScheduleMode("recurring")}
+            className="flex-1"
+          >
+            <Repeat className="size-4" />
+            Recurring
+          </Button>
+        </div>
       </div>
 
-      {/* Interval for every-n-seconds */}
-      {showSecondInterval ? (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Interval</Label>
-          <Select value={secondInterval} onValueChange={handleSecondIntervalChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SECOND_INTERVALS.map((si) => (
-                <SelectItem key={si.value} value={si.value}>
-                  Every {si.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      {/* Interval for every-n-minutes */}
-      {showMinuteInterval ? (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Interval</Label>
-          <Select value={minuteInterval} onValueChange={handleMinuteIntervalChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MINUTE_INTERVALS.map((mi) => (
-                <SelectItem key={mi.value} value={mi.value}>
-                  Every {mi.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      {/* Time selectors */}
-      {showMinute || showHour ? (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            Time
-          </Label>
-          <div className="flex gap-2">
-            {showHour ? (
-              <Select value={hour} onValueChange={handleHourChange}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Hour" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 24 }, (_, i) => {
-                    const period = i >= 12 ? "PM" : "AM";
-                    const h12 = i % 12 || 12;
-                    const val = String(i);
-                    return (
-                      <SelectItem key={val} value={val}>
-                        {h12} {period}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            ) : null}
-            {showMinute ? (
-              <Select value={minute} onValueChange={handleMinuteChange}>
-                <SelectTrigger className={showHour ? "flex-1" : "w-full"}>
-                  <SelectValue placeholder="Minute" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 60 }, (_, i) => {
-                    const val = String(i);
-                    return (
-                      <SelectItem key={val} value={val}>
-                        :{i.toString().padStart(2, "0")}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            ) : null}
+      {/* ── Once Mode ── */}
+      {scheduleMode === "once" && !manualMode && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              Date
+            </Label>
+            <DatePicker value={onceDate} onChange={handleOnceDate} />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              Time
+            </Label>
+            <Input
+              type="time"
+              step="1"
+              value={onceTime}
+              onChange={(e) => handleOnceTime(e.target.value)}
+              className="w-full"
+            />
           </div>
         </div>
-      ) : null}
+      )}
 
-      {/* Day of week */}
-      {showDayOfWeek ? (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            Day of week
-          </Label>
-          <Select value={dayOfWeek} onValueChange={handleDayOfWeekChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DAYS_OF_WEEK.map((day) => (
-                <SelectItem key={day.value} value={day.value}>
-                  {day.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* ── Recurring Mode ── */}
+      {scheduleMode === "recurring" && !manualMode && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Repeat className="h-4 w-4 text-muted-foreground" />
+              Frequency
+            </Label>
+            <FrequencySelect value={frequency} onChange={handleFrequency} />
+          </div>
+
+          {showIntervalN && (
+            <IntervalInput
+              value={intervalN}
+              onChange={handleIntervalN}
+              unit={intervalUnit[frequency] ?? ""}
+              min={1}
+              max={intervalMax[frequency] ?? 60}
+            />
+          )}
+
+          {showTime && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                {showHour ? "Time" : "At minute"}
+              </Label>
+              <div className="flex gap-2">
+                {showHour && <HourSelect value={hour} onChange={handleHour} />}
+                <MinuteSelect value={minute} onChange={handleMinute} />
+              </div>
+            </div>
+          )}
+
+          {showWeekdaySingle && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                Day of week
+              </Label>
+              <Select value={weekdays[0] ?? "1"} onValueChange={(v) => handleWeekdays([v])}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WEEKDAYS.map((day) => (
+                    <SelectItem key={day.value} value={day.value}>
+                      {getDayName(day.value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {showWeekdays && <WeekdaySelector value={weekdays} onChange={handleWeekdays} />}
+
+          {showDayOfMonth && <DayOfMonthSelect value={dayOfMonth} onChange={handleDayOfMonth} />}
         </div>
-      ) : null}
+      )}
 
-      {/* Day of month */}
-      {showDayOfMonth ? (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            Day of month
-          </Label>
-          <Select value={dayOfMonth} onValueChange={handleDayOfMonthChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 31 }, (_, i) => {
-                const val = String(i + 1);
-                return (
-                  <SelectItem key={val} value={val}>
-                    {getOrdinal(i + 1)}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+      {/* ── Manual Cron Mode ── */}
+      {manualMode && (
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Code2 className="h-4 w-4 text-muted-foreground" />
+              Cron expression
+            </Label>
+            <Input
+              type="text"
+              value={manualCron}
+              onChange={(e) => handleManualCron(e.target.value)}
+              placeholder="* * * * *"
+              className={cn(
+                "font-mono text-sm",
+                manualCron && !manualValid && "border-destructive focus-visible:ring-destructive/50"
+              )}
+              spellCheck={false}
+            />
+          </div>
+          <CronSyntaxReference />
         </div>
-      ) : null}
+      )}
 
-      {/* Plain-English description */}
-      <div className="flex items-start gap-2 rounded-lg bg-muted/50 border border-border/50 px-3 py-2.5">
+      <Separator />
+
+      {/* ── Manual Toggle ── */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            setManualMode(!manualMode);
+            if (!manualMode) {
+              setManualCron(value);
+            } else {
+              const p = parseCronToState(manualCron || value);
+              setScheduleMode(p.scheduleMode);
+              setFrequency(p.frequency);
+              setMinute(p.minute);
+              setHour(p.hour);
+              setDayOfMonth(p.dayOfMonth);
+              setWeekdays(p.weekdays);
+              setIntervalN(p.intervalN);
+              setOnceDate(p.onceDate);
+              setOnceTime(p.onceTime);
+            }
+          }}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 cursor-pointer"
+        >
+          <Code2 className="h-3.5 w-3.5" />
+          {manualMode ? "Use visual builder" : "Enter cron manually"}
+        </button>
+
+        {manualMode && manualCron && (
+          <span
+            className={cn("text-xs font-medium", manualValid ? "text-primary" : "text-destructive")}
+          >
+            {manualValid ? "Valid" : "Invalid"}
+          </span>
+        )}
+      </div>
+
+      {/* ── Description with server timezone ── */}
+      <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 border border-border/50 px-3.5 py-3">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <p className="text-sm text-foreground/80">{description}</p>
+        <div className="space-y-0.5">
+          <p className="text-sm text-foreground/80">{description}</p>
+          {tzLabel && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Globe className="h-3 w-3" />
+              {tzLabel}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

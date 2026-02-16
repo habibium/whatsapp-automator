@@ -21,7 +21,13 @@ import { Label } from "../components/ui/label";
 import { Skeleton } from "../components/ui/skeleton";
 import { Switch } from "../components/ui/switch";
 import { Textarea } from "../components/ui/textarea";
-import { useCreateMessage, useMessage, useUpdateMessage, useWhatsAppGroups } from "../lib/queries";
+import {
+  useCreateMessage,
+  useMessage,
+  useServerTimezone,
+  useUpdateMessage,
+  useWhatsAppGroups
+} from "../lib/queries";
 
 function FormSkeleton() {
   return (
@@ -72,6 +78,9 @@ export function MessageFormPage() {
 
   // Groups query — only fetch when isGroup is true
   const { data: groups = [], isLoading: loadingGroups } = useWhatsAppGroups(isGroup);
+
+  // Server timezone
+  const { data: serverTimezone } = useServerTimezone();
 
   // Populate form when existing message loads
   useEffect(() => {
@@ -304,7 +313,11 @@ export function MessageFormPage() {
             <CardDescription>Define when this message should be sent</CardDescription>
           </CardHeader>
           <CardContent>
-            <CronScheduleBuilder value={cronExpression} onChange={setCronExpression} />
+            <CronScheduleBuilder
+              value={cronExpression}
+              onChange={setCronExpression}
+              serverTimezone={serverTimezone}
+            />
           </CardContent>
         </Card>
 
