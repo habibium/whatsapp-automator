@@ -1,0 +1,12 @@
+.git
+.gitignore
+.vscode
+.claude
+
+node_modules
+.turbo
+dist
+
+.env
+tsconfig.tsbuildinfo
+**/*.log

@@ -65,7 +65,7 @@ app.get("/api/timezone", (c) => {
 });
 
 // Serve static files for production
-const staticDir = join(import.meta.dirname, "../../web/dist");
+const staticDir = process.env["WEB_DIST_DIR"] ?? join(process.cwd(), "../web/dist");
 
 app.get("*", async (c) => {
   const path = c.req.path === "/" ? "/index.html" : c.req.path;
