@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch --env-file=../../.env src/index.ts",
     "build": "tsc",
-    "start": "NODE_ENV=production node dist/src/index.js",
+    "start": "NODE_ENV=production node --env-file=../../.env dist/src/index.js",
     "clean": "rm -rf dist",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
