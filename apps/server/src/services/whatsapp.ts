@@ -15,6 +15,7 @@ import {
 } from "baileys";
 import pino from "pino";
 import {
+  clearWhatsAppAuthState,
   getWhatsAppConnection,
   updateWhatsAppStatus,
   upsertWhatsAppConnection
@@ -31,6 +32,7 @@ type UserConnection = {
   status: "disconnected" | "connecting" | "awaiting_qr" | "connected";
   lastQR: string | null;
   eventHandlers: Set<ConnectionEventHandler>;
+  intentionalDisconnect: boolean;
 };
 
 class WhatsAppService {
@@ -39,7 +41,13 @@ class WhatsAppService {
   private getOrCreateConnection(userId: string): UserConnection {
     let conn = this.connections.get(userId);
     if (!conn) {
-      conn = { socket: null, status: "disconnected", lastQR: null, eventHandlers: new Set() };
+      conn = {
+        socket: null,
+        status: "disconnected",
+        lastQR: null,
+        eventHandlers: new Set(),
+        intentionalDisconnect: false
+      };
       this.connections.set(userId, conn);
     }
     return conn;
@@ -72,6 +80,7 @@ class WhatsAppService {
     }
 
     conn.status = "connecting";
+    conn.intentionalDisconnect = false;
     await updateWhatsAppStatus(userId, "connecting");
 
     const { state, saveCreds } = await this.createAuthState(userId);
@@ -101,20 +110,29 @@ class WhatsAppService {
 
       if (connection === "close") {
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+        const wasIntentional = conn.intentionalDisconnect;
         const reason = (lastDisconnect?.error as Error)?.message ?? "Unknown";
 
         conn.status = "disconnected";
         conn.socket = null;
         conn.lastQR = null;
+
+        // If logged out from phone, clear stale auth state so fresh QR is generated next time
+        if (isLoggedOut) {
+          logger.info({ userId }, "WhatsApp logged out — clearing auth state for re-pairing");
+          await clearWhatsAppAuthState(userId);
+        }
+
         await updateWhatsAppStatus(userId, "disconnected");
 
         for (const handler of conn.eventHandlers) {
           handler.onDisconnected(reason);
         }
 
-        if (shouldReconnect) {
-          logger.info({ userId }, "Reconnecting after disconnect");
+        // Only auto-reconnect if NOT intentional and NOT logged out
+        if (!wasIntentional && !isLoggedOut) {
+          logger.info({ userId }, "Reconnecting after unexpected disconnect");
           setTimeout(() => this.connect(userId), 3000);
         }
       } else if (connection === "open") {
@@ -132,12 +150,46 @@ class WhatsAppService {
 
   async disconnect(userId: string): Promise<void> {
     const conn = this.connections.get(userId);
-    if (conn?.socket) {
-      conn.socket.end(undefined);
-      conn.socket = null;
+    if (conn) {
+      conn.intentionalDisconnect = true;
+      if (conn.socket) {
+        try {
+          conn.socket.end(undefined);
+        } catch (error) {
+          logger.debug({ userId, error }, "Error during socket.end (ignored)");
+        }
+        conn.socket = null;
+      }
       conn.status = "disconnected";
       conn.lastQR = null;
       await updateWhatsAppStatus(userId, "disconnected");
+
+      for (const handler of conn.eventHandlers) {
+        handler.onDisconnected("User disconnected");
+      }
+    }
+  }
+
+  async logout(userId: string): Promise<void> {
+    const conn = this.connections.get(userId);
+    if (conn) {
+      conn.intentionalDisconnect = true;
+      if (conn.socket) {
+        try {
+          await conn.socket.logout();
+        } catch (error) {
+          logger.debug({ userId, error }, "Error during socket.logout (ignored)");
+        }
+        conn.socket = null;
+      }
+      conn.status = "disconnected";
+      conn.lastQR = null;
+      await clearWhatsAppAuthState(userId);
+      await updateWhatsAppStatus(userId, "disconnected");
+
+      for (const handler of conn.eventHandlers) {
+        handler.onDisconnected("Logged out");
+      }
     }
   }
 

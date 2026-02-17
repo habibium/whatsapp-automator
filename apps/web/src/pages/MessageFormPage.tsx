@@ -5,6 +5,7 @@ import {
   MessageSquareText,
   Save,
   Send,
+  Unplug,
   User,
   Users
 } from "lucide-react";
@@ -28,6 +29,7 @@ import {
   useUpdateMessage,
   useWhatsAppGroups
 } from "../lib/queries";
+import { useWhatsAppStore } from "../stores/whatsapp";
 
 function FormSkeleton() {
   return (
@@ -60,6 +62,11 @@ export function MessageFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
+
+  // WhatsApp connection check
+  const whatsappStatus = useWhatsAppStore((s) => s.status);
+  const whatsappLoading = useWhatsAppStore((s) => s.loading);
+  const isConnected = whatsappStatus === "connected";
 
   // Queries
   const { data: existingMessage, isLoading: loadingMessage, error: messageError } = useMessage(id);
@@ -139,6 +146,41 @@ export function MessageFormPage() {
 
   if (loadingMessage && isEditing) {
     return <FormSkeleton />;
+  }
+
+  // Gate: WhatsApp must be connected
+  if (!isConnected && !whatsappLoading) {
+    return (
+      <div className="mx-auto max-w-2xl pb-8">
+        <div className="mb-8 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isEditing ? "Edit Message" : "New Scheduled Message"}
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
+              <Unplug className="h-7 w-7 text-amber-500" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold">WhatsApp Not Connected</h3>
+            <p className="mt-1 text-center text-sm text-muted-foreground">
+              You need to connect your WhatsApp account before you can{" "}
+              {isEditing ? "edit" : "create"} messages.
+            </p>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              Click the connection indicator in the header to connect.
+            </p>
+            <Button variant="outline" className="mt-4" onClick={() => navigate("/")}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Messages
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (messageError && isEditing) {

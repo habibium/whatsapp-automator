@@ -61,6 +61,8 @@ export const whatsappApi = {
   disconnect: () =>
     apiClient.post<{ status: WhatsAppStatus }>("/whatsapp/disconnect").then((r) => r.data),
 
+  logout: () => apiClient.post<{ status: WhatsAppStatus }>("/whatsapp/logout").then((r) => r.data),
+
   groups: () => apiClient.get<WhatsAppGroup[]>("/whatsapp/groups").then((r) => r.data)
 };
 

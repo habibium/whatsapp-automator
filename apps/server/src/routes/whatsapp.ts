@@ -90,6 +90,13 @@ whatsappRoutes.post("/disconnect", async (c) => {
   return c.json({ success: true, data: { status: "disconnected" } });
 });
 
+// Logout WhatsApp (clears auth state for re-pairing)
+whatsappRoutes.post("/logout", async (c) => {
+  const user = c.get("user");
+  await whatsappService.logout(user.id);
+  return c.json({ success: true, data: { status: "disconnected" } });
+});
+
 // Get available groups
 whatsappRoutes.get("/groups", async (c) => {
   const user = c.get("user");

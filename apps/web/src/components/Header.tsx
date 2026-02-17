@@ -7,6 +7,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  RefreshCw,
   Smartphone,
   Sun,
   Unplug,
@@ -73,7 +74,7 @@ function ThemeSegmentedControl() {
 }
 
 function ConnectionStatusButton() {
-  const { status, qrCode, loading, connect, disconnect } = useWhatsAppStore();
+  const { status, qrCode, loading, connect, disconnect, logout } = useWhatsAppStore();
 
   useEffect(() => {
     useWhatsAppStore.getState().fetchStatus();
@@ -81,12 +82,22 @@ function ConnectionStatusButton() {
   }, []);
 
   const isConnected = status === "connected";
+  const isConnecting = status === "connecting" || (loading && status === "disconnected");
+  const isAwaitingQR = status === "awaiting_qr";
 
   const handleConnect = () => {
-    if (status !== "connected" && !loading) {
+    if (!isConnected && !loading) {
       connect();
     }
   };
+
+  const statusLabel = isConnected
+    ? "Connected"
+    : isAwaitingQR
+      ? "Scan QR"
+      : isConnecting
+        ? "Connecting"
+        : "Disconnected";
 
   return (
     <Popover>
@@ -99,16 +110,20 @@ function ConnectionStatusButton() {
         >
           <span
             className={cn(
-              "h-2 w-2 rounded-full",
-              isConnected ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]" : "bg-red-500/70"
+              "h-2 w-2 rounded-full transition-colors",
+              isConnected
+                ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]"
+                : isConnecting || isAwaitingQR
+                  ? "animate-pulse bg-amber-500"
+                  : "bg-red-500/70"
             )}
           />
-          <span className="hidden sm:inline">{isConnected ? "Connected" : "Disconnected"}</span>
+          <span className="hidden sm:inline">{statusLabel}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex flex-col items-center px-5 py-6">
-          {status === "connected" ? (
+          {isConnected ? (
             <>
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10">
                 <CheckCircle className="h-7 w-7 text-green-500" />
@@ -117,18 +132,30 @@ function ConnectionStatusButton() {
               <p className="mt-1 text-center text-xs text-muted-foreground">
                 Your WhatsApp account is linked and ready.
               </p>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="mt-4"
-                onClick={disconnect}
-                disabled={loading}
-              >
-                <Unplug className="mr-2 h-3.5 w-3.5" />
-                Disconnect
-              </Button>
+              <div className="mt-4 flex gap-2">
+                <Button variant="outline" size="sm" onClick={disconnect} disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Unplug className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  Disconnect
+                </Button>
+                <Button variant="destructive" size="sm" onClick={logout} disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <LogOut className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  Logout
+                </Button>
+              </div>
+              <p className="mt-3 text-center text-[11px] text-muted-foreground">
+                <strong>Disconnect</strong> keeps session &middot; <strong>Logout</strong> unlinks
+                device
+              </p>
             </>
-          ) : status === "awaiting_qr" && qrCode ? (
+          ) : isAwaitingQR && qrCode ? (
             <>
               <div className="rounded-xl border border-border bg-white p-2.5">
                 <img src={qrCode} alt="WhatsApp QR Code" className="h-48 w-48" />
@@ -140,6 +167,20 @@ function ConnectionStatusButton() {
                   Settings &rarr; Linked Devices &rarr; Link a Device
                 </span>
               </p>
+            </>
+          ) : status === "disconnected" && !loading ? (
+            <>
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
+                <Unplug className="h-7 w-7 text-red-500/70" />
+              </div>
+              <h3 className="mt-3 text-base font-semibold">Disconnected</h3>
+              <p className="mt-1 text-center text-xs text-muted-foreground">
+                Connect to start sending scheduled messages.
+              </p>
+              <Button size="sm" className="mt-4" onClick={handleConnect}>
+                <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                Connect
+              </Button>
             </>
           ) : (
             <>

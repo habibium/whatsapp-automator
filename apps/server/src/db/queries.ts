@@ -70,6 +70,13 @@ export async function updateWhatsAppStatus(userId: string, status: string) {
     .where(eq(schema.whatsappConnections.userId, userId));
 }
 
+export async function clearWhatsAppAuthState(userId: string) {
+  await db
+    .update(schema.whatsappConnections)
+    .set({ authState: null, status: "disconnected", updatedAt: new Date() })
+    .where(eq(schema.whatsappConnections.userId, userId));
+}
+
 // Scheduled message queries
 export async function getScheduledMessages(userId: string) {
   return db.query.scheduledMessages.findMany({
