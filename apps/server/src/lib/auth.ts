@@ -4,20 +4,9 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/index.js";
 import { sendEmail } from "./email.js";
 
-const baseURL = process.env["BETTER_AUTH_URL"] ?? "http://localhost:3000";
+import { getAllowedOrigins } from "./origins.js";
 
-// Collect trusted origins from CORS config
-const defaultOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "http://192.168.0.18:5173",
-  "http://192.168.0.18:3000"
-];
-const envOrigins =
-  process.env["CORS_ORIGINS"]
-    ?.split(",")
-    .map((o) => o.trim())
-    .filter(Boolean) ?? [];
+const baseURL = process.env["BETTER_AUTH_URL"] ?? "http://localhost:3000";
 
 export const auth = betterAuth({
   baseURL,
@@ -26,7 +15,10 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg"
   }),
-  trustedOrigins: [...defaultOrigins, ...envOrigins],
+  trustedOrigins: (request) => {
+    const origin = request?.headers.get("origin");
+    return origin ? getAllowedOrigins(origin) : [];
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

@@ -20,33 +20,15 @@ app.onError((err, c) => {
   return c.json({ success: false, error: "Internal server error" }, 500);
 });
 
+import { isAllowedOrigin } from "./lib/origins.js";
+
 // CORS configuration
-const defaultOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "http://192.168.0.18:5173",
-  "http://192.168.0.18:3000"
-];
-
-// Allow additional origins via environment variable (comma-separated)
-const envOrigins =
-  process.env["CORS_ORIGINS"]
-    ?.split(",")
-    .map((o) => o.trim())
-    .filter(Boolean) ?? [];
-const allowedOrigins = [...defaultOrigins, ...envOrigins];
-
 app.use(
   "/api/*",
   cors({
     origin: (origin) => {
-      if (!origin) return allowedOrigins[0];
-      if (allowedOrigins.includes(origin)) return origin;
-      // Allow local network IPs only for common dev ports
-      if (/^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|5173)$/.test(origin ?? "")) {
-        return origin;
-      }
-      return null;
+      if (!origin) return "http://localhost:3000";
+      return isAllowedOrigin(origin) ? origin : null;
     },
     credentials: true
   })
