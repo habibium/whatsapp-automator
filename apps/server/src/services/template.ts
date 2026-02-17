@@ -1,5 +1,7 @@
 import { networkInterfaces } from "node:os";
-import { getUserById } from "../db/queries.js";
+import { eq } from "drizzle-orm";
+import { db } from "../db/index.js";
+import { user as userTable } from "../db/schema.js";
 import { whatsappService } from "./whatsapp.js";
 
 /**
@@ -48,7 +50,11 @@ export async function processTemplate(template: string, userId: string): Promise
     return template;
   }
 
-  const user = await getUserById(userId);
+  const user = await db
+    .select()
+    .from(userTable)
+    .where(eq(userTable.id, userId))
+    .then((r) => r[0]);
   const phone = whatsappService.getPhoneNumber(userId);
   const port = process.env["PORT"] || "3000";
 

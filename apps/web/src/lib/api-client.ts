@@ -17,6 +17,7 @@ export function buildApiUrl(endpoint: string): string {
  * Response interceptor: unwrap the `{ success, data, error }` envelope.
  * - On `success: true` → return `response.data.data`
  * - On `success: false` → reject with the server error message
+ * - On 401 → redirect to login page
  * - On network / non-2xx errors → reject with a human-readable message
  */
 apiClient.interceptors.response.use(
@@ -38,6 +39,22 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (axios.isAxiosError(error)) {
+      // On 401, redirect to login (session expired / unauthorized)
+      if (error.response?.status === 401) {
+        const currentPath = window.location.pathname;
+        if (currentPath !== "/login" && currentPath !== "/register") {
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+        }
+        return Promise.reject(new ApiError("Session expired. Please sign in again.", 401));
+      }
+
+      // On 429, show a user-friendly rate limit message
+      if (error.response?.status === 429) {
+        return Promise.reject(
+          new ApiError("Too many requests. Please slow down and try again.", 429)
+        );
+      }
+
       const message =
         error.response?.data?.error ??
         error.response?.data?.message ??

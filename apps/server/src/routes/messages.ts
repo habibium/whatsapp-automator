@@ -38,61 +38,109 @@ messagesRoutes.get("/:id", async (c) => {
 // Create new scheduled message
 messagesRoutes.post("/", async (c) => {
   const user = c.get("user");
-  const body = await c.req.json<{
+
+  let body: {
     target?: string;
     isGroup?: boolean;
     message?: string;
     cronExpression?: string;
     enabled?: boolean;
-  }>();
+  };
 
-  if (!body.target || !body.message || !body.cronExpression) {
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: "Invalid JSON body" }, 400);
+  }
+
+  const target = typeof body.target === "string" ? body.target.trim() : "";
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  const cronExpression = typeof body.cronExpression === "string" ? body.cronExpression.trim() : "";
+
+  if (!target || !message || !cronExpression) {
     return c.json(
       { success: false, error: "target, message, and cronExpression are required" },
       400
     );
   }
 
-  if (!cron.validate(body.cronExpression)) {
+  if (target.length > 255) {
+    return c.json({ success: false, error: "target must be 255 characters or less" }, 400);
+  }
+
+  if (message.length > 10_000) {
+    return c.json({ success: false, error: "message must be 10,000 characters or less" }, 400);
+  }
+
+  if (!cron.validate(cronExpression)) {
     return c.json({ success: false, error: "Invalid cron expression" }, 400);
   }
 
-  const message = await createScheduledMessage(user.id, {
-    target: body.target,
-    isGroup: body.isGroup ?? false,
-    message: body.message,
-    cronExpression: body.cronExpression,
-    enabled: body.enabled ?? true
+  const message_ = await createScheduledMessage(user.id, {
+    target,
+    isGroup: body.isGroup === true,
+    message,
+    cronExpression,
+    enabled: body.enabled !== false
   });
 
   // Update scheduler
-  schedulerService.updateSchedule(message);
+  schedulerService.updateSchedule(message_);
 
-  return c.json({ success: true, data: message }, 201);
+  return c.json({ success: true, data: message_ }, 201);
 });
 
 // Update scheduled message
 messagesRoutes.put("/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const body = await c.req.json<{
+
+  let body: {
     target?: string;
     isGroup?: boolean;
     message?: string;
     cronExpression?: string;
     enabled?: boolean;
-  }>();
+  };
+
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: "Invalid JSON body" }, 400);
+  }
 
   const existing = await getScheduledMessageById(id, user.id);
   if (!existing) {
     return c.json({ success: false, error: "Message not found" }, 404);
   }
 
+  if (typeof body.target === "string" && body.target.trim().length > 255) {
+    return c.json({ success: false, error: "target must be 255 characters or less" }, 400);
+  }
+  if (typeof body.message === "string" && body.message.trim().length > 10_000) {
+    return c.json({ success: false, error: "message must be 10,000 characters or less" }, 400);
+  }
+
   if (body.cronExpression && !cron.validate(body.cronExpression)) {
     return c.json({ success: false, error: "Invalid cron expression" }, 400);
   }
 
-  const updated = await updateScheduledMessage(id, user.id, body);
+  // Sanitize update payload — only allow known fields with correct types
+  const updateData: Partial<{
+    target: string;
+    isGroup: boolean;
+    message: string;
+    cronExpression: string;
+    enabled: boolean;
+  }> = {};
+  if (typeof body.target === "string") updateData.target = body.target.trim();
+  if (typeof body.isGroup === "boolean") updateData.isGroup = body.isGroup;
+  if (typeof body.message === "string") updateData.message = body.message.trim();
+  if (typeof body.cronExpression === "string")
+    updateData.cronExpression = body.cronExpression.trim();
+  if (typeof body.enabled === "boolean") updateData.enabled = body.enabled;
+
+  const updated = await updateScheduledMessage(id, user.id, updateData);
 
   if (updated) {
     schedulerService.updateSchedule(updated);

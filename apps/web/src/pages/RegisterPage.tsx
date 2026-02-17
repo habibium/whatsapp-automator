@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
-import { CalendarClock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Footer } from "../components/Footer";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
@@ -15,34 +15,46 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { getErrorMessage } from "../lib/api";
-import { useAuthStore } from "../stores/auth";
+import { authClient } from "../lib/auth-client";
 
 export function RegisterPage() {
-  const register = useAuthStore((s) => s.register);
-  const navigate = useNavigate();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [registered, setRegistered] = useState(false);
 
   const registerMutation = useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const err = await register(email, password);
-      if (err) {
-        throw new Error(err);
+    mutationFn: async ({
+      name,
+      email,
+      password
+    }: {
+      name: string;
+      email: string;
+      password: string;
+    }) => {
+      const { error } = await authClient.signUp.email({ name, email, password });
+      if (error) {
+        throw new Error(error.message ?? "Registration failed");
       }
     },
     onSuccess: () => {
-      navigate("/");
+      setRegistered(true);
     }
   });
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     setValidationError(null);
+
+    if (!name.trim()) {
+      setValidationError("Name is required");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setValidationError("Passwords do not match");
@@ -54,11 +66,49 @@ export function RegisterPage() {
       return;
     }
 
-    registerMutation.mutate({ email, password });
+    registerMutation.mutate({ name, email, password });
   };
 
-  const error =
-    validationError ?? (registerMutation.error ? getErrorMessage(registerMutation.error) : null);
+  const error = validationError ?? registerMutation.error?.message ?? null;
+
+  // ── Email verification pending ──────────────────────────────────
+  if (registered) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+          <Card>
+            <CardContent className="flex flex-col items-center gap-4 pt-8 pb-8 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15">
+                <Mail className="h-7 w-7 text-green-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Check your email</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  We've sent a verification link to{" "}
+                  <span className="font-medium text-foreground">{email}</span>. Click the link to
+                  activate your account.
+                </p>
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <span>The link expires in 1 hour</span>
+              </div>
+            </CardContent>
+            <CardFooter className="justify-center">
+              <Link to="/login" className="text-sm font-medium text-primary hover:underline">
+                Back to sign in
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
+        <div className="mt-8">
+          <Footer />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Registration form ───────────────────────────────────────────
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -87,6 +137,19 @@ export function RegisterPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               ) : null}
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoComplete="name"
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

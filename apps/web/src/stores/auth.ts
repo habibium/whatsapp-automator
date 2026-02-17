@@ -1,14 +1,22 @@
 import { create } from "zustand";
-import { authApi, getErrorMessage, type User } from "../lib/api";
+import { authClient } from "../lib/auth-client";
+
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image?: string | null | undefined;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<string | null>;
-  register: (email: string, password: string) => Promise<string | null>;
-  logout: () => Promise<void>;
-  refresh: () => Promise<void>;
   initialize: () => Promise<void>;
+  refresh: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
@@ -17,8 +25,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   initialize: async () => {
     try {
-      const user = await authApi.me();
-      set({ user, loading: false });
+      const { data } = await authClient.getSession();
+      set({ user: data?.user ?? null, loading: false });
     } catch {
       set({ user: null, loading: false });
     }
@@ -26,36 +34,16 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   refresh: async () => {
     try {
-      const user = await authApi.me();
-      set({ user });
+      const { data } = await authClient.getSession();
+      set({ user: data?.user ?? null });
     } catch {
       set({ user: null });
     }
   },
 
-  login: async (email, password) => {
-    try {
-      const user = await authApi.login(email, password);
-      set({ user });
-      return null;
-    } catch (error) {
-      return getErrorMessage(error);
-    }
-  },
-
-  register: async (email, password) => {
-    try {
-      const user = await authApi.register(email, password);
-      set({ user });
-      return null;
-    } catch (error) {
-      return getErrorMessage(error);
-    }
-  },
-
   logout: async () => {
     try {
-      await authApi.logout();
+      await authClient.signOut();
     } finally {
       set({ user: null });
     }

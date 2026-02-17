@@ -231,7 +231,16 @@ function UserMenu() {
     navigate("/login");
   };
 
-  const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "??";
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : user?.email
+      ? user.email.slice(0, 2).toUpperCase()
+      : "??";
 
   return (
     <DropdownMenu>
@@ -255,7 +264,8 @@ function UserMenu() {
         <DropdownMenuGroup className="mt-4">
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="font-normal">
-            <p className="truncate text-sm font-medium">{user?.email}</p>
+            <p className="truncate text-sm font-medium">{user?.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
           </DropdownMenuLabel>
 
           <DropdownMenuItem

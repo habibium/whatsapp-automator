@@ -6,10 +6,12 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { Toaster } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MessageFormPage } from "./pages/MessageFormPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { useAuthStore } from "./stores/auth";
 
 const queryClient = new QueryClient({
@@ -37,6 +39,8 @@ export function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
                   <Route path="/" element={<MessagesPage />} />

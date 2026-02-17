@@ -1,44 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "./index.js";
 
-// User queries
-export async function createUser(email: string, passwordHash: string) {
-  const [user] = await db.insert(schema.users).values({ email, passwordHash }).returning();
-  return user;
-}
-
-export async function getUserByEmail(email: string) {
-  return db.query.users.findFirst({
-    where: eq(schema.users.email, email)
-  });
-}
-
-export async function getUserById(id: string) {
-  return db.query.users.findFirst({
-    where: eq(schema.users.id, id)
-  });
-}
-
-// Session queries
-export async function createSession(userId: string, expiresAt: Date) {
-  const [session] = await db.insert(schema.sessions).values({ userId, expiresAt }).returning();
-  return session;
-}
-
-export async function getSessionById(id: string) {
-  return db.query.sessions.findFirst({
-    where: eq(schema.sessions.id, id)
-  });
-}
-
-export async function deleteSession(id: string) {
-  await db.delete(schema.sessions).where(eq(schema.sessions.id, id));
-}
-
-export async function deleteExpiredSessions() {
-  await db.delete(schema.sessions).where(eq(schema.sessions.expiresAt, new Date()));
-}
-
 // WhatsApp connection queries
 export async function getWhatsAppConnection(userId: string) {
   return db.query.whatsappConnections.findFirst({

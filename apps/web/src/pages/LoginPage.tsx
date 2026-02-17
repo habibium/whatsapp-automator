@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { CalendarClock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Footer } from "../components/Footer";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
@@ -15,35 +15,37 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { getErrorMessage } from "../lib/api";
+import { authClient } from "../lib/auth-client";
 import { useAuthStore } from "../stores/auth";
 
 export function LoginPage() {
-  const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
+  const refresh = useAuthStore((s) => s.refresh);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const loginMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const err = await login(email, password);
-      if (err) {
-        throw new Error(err);
+      const { error } = await authClient.signIn.email({ email, password });
+      if (error) {
+        throw new Error(error.message ?? "Sign in failed");
       }
     },
-    onSuccess: () => {
-      navigate("/");
+    onSuccess: async () => {
+      await refresh();
+      navigate(redirect);
     }
   });
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
-
     loginMutation.mutate({ email, password });
   };
 
-  const error = loginMutation.error ? getErrorMessage(loginMutation.error) : null;
+  const error = loginMutation.error?.message ?? null;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -106,6 +108,15 @@ export function LoginPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-end">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
               </div>
 
               <Button type="submit" className="w-full" disabled={loginMutation.isPending}>

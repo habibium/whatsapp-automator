@@ -5,13 +5,20 @@ import { logger } from "@pkg/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { testConnection } from "./db/index.js";
-import { authRoutes } from "./routes/auth.js";
+import { auth } from "./lib/auth.js";
+import { rateLimiter } from "./middleware/rate-limit.js";
 import { messagesRoutes } from "./routes/messages.js";
 import { whatsappRoutes } from "./routes/whatsapp.js";
 import { schedulerService } from "./services/scheduler.js";
 import { whatsappService } from "./services/whatsapp.js";
 
 const app = new Hono();
+
+// Global error handler — never leak internal details
+app.onError((err, c) => {
+  logger.error({ err: err.message, path: c.req.path }, "Unhandled error");
+  return c.json({ success: false, error: "Internal server error" }, 500);
+});
 
 // CORS configuration
 const defaultOrigins = [
@@ -33,20 +40,29 @@ app.use(
   "/api/*",
   cors({
     origin: (origin) => {
-      // Allow requests with no origin (like mobile apps or curl)
       if (!origin) return allowedOrigins[0];
-      // Check if origin is in allowed list or is a local network IP
-      if (allowedOrigins.includes(origin) || /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)) {
+      if (allowedOrigins.includes(origin)) return origin;
+      // Allow local network IPs only for common dev ports
+      if (/^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|5173)$/.test(origin ?? "")) {
         return origin;
       }
-      return allowedOrigins[0];
+      return null;
     },
     credentials: true
   })
 );
 
-// API routes
-app.route("/api/auth", authRoutes);
+// Rate limiting — stricter for auth, lighter for general API
+const authLimiter = rateLimiter({ max: 10, windowMs: 60_000 }); // 10 req/min per IP
+const apiLimiter = rateLimiter({ max: 60, windowMs: 60_000 }); // 60 req/min per IP
+
+app.use("/api/auth/*", authLimiter);
+app.use("/api/messages/*", apiLimiter);
+app.use("/api/whatsapp/*", apiLimiter);
+
+// API routes — Better Auth handler
+app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
 app.route("/api/whatsapp", whatsappRoutes);
 app.route("/api/messages", messagesRoutes);
 

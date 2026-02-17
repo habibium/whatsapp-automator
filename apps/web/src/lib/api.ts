@@ -5,12 +5,6 @@ export { ApiError, buildApiUrl, getErrorMessage } from "./api-client";
 
 // ── Types ──────────────────────────────────────────────────────────
 
-export type User = {
-  id: string;
-  email: string;
-  createdAt: string;
-};
-
 export type ScheduledMessage = {
   id: string;
   userId: string;
@@ -34,20 +28,6 @@ export type WhatsAppStatus = "connected" | "disconnected" | "connecting" | "awai
 export type WhatsAppGroup = {
   id: string;
   name: string;
-};
-
-// ── Auth API ───────────────────────────────────────────────────────
-
-export const authApi = {
-  login: (email: string, password: string) =>
-    apiClient.post<User>("/auth/login", { email, password }).then((r) => r.data),
-
-  register: (email: string, password: string) =>
-    apiClient.post<User>("/auth/register", { email, password }).then((r) => r.data),
-
-  logout: () => apiClient.post("/auth/logout").then((r) => r.data),
-
-  me: () => apiClient.get<User>("/auth/me").then((r) => r.data)
 };
 
 // ── WhatsApp API ───────────────────────────────────────────────────
