@@ -2,8 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { CalendarClock, CheckCircle2, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { Link } from "react-router-dom";
+import { AuthAlert } from "../components/AuthAlert";
 import { Footer } from "../components/Footer";
-import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -37,7 +37,12 @@ export function RegisterPage() {
       email: string;
       password: string;
     }) => {
-      const { error } = await authClient.signUp.email({ name, email, password });
+      const { error } = await authClient.signUp.email({
+        name,
+        email,
+        password,
+        callbackURL: window.location.origin + "/"
+      });
       if (error) {
         throw new Error(error.message ?? "Registration failed");
       }
@@ -132,11 +137,7 @@ export function RegisterPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error ? (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              ) : null}
+              {error ? <AuthAlert variant="error" message={error} /> : null}
 
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>

@@ -2,8 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { CalendarClock, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { AuthAlert } from "../components/AuthAlert";
 import { Footer } from "../components/Footer";
-import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -132,11 +132,7 @@ export function ResetPasswordPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error ? (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              ) : null}
+              {error ? <AuthAlert variant="error" message={error} /> : null}
 
               <div className="space-y-2">
                 <Label htmlFor="password">New Password</Label>

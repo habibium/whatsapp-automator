@@ -6,7 +6,10 @@ const baseURL = import.meta.env["VITE_API_URL"]
 
 export const authClient = createAuthClient({
   baseURL,
-  basePath: "/api/auth"
+  basePath: "/api/auth",
+  fetchOptions: {
+    credentials: "include" as RequestCredentials
+  }
 });
 
 export const { signIn, signUp, signOut, useSession } = authClient;

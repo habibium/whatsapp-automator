@@ -7,6 +7,7 @@ import { sendEmail } from "./email.js";
 import { getAllowedOrigins } from "./origins.js";
 
 const baseURL = process.env["BETTER_AUTH_URL"] ?? "http://localhost:3000";
+const appURL = process.env["APP_URL"] ?? baseURL;
 
 export const auth = betterAuth({
   baseURL,
@@ -26,23 +27,29 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
     autoSignIn: false, // Don't auto sign-in; require email verification first
     sendResetPassword: async ({ user, url }) => {
+      // Rewrite the URL so it points to the frontend app, not the API server
+      const resetUrl = url.replace(baseURL, appURL);
       logger.info({ email: user.email }, "Sending password reset email");
       await sendEmail({
         to: user.email,
         subject: "Reset your password — WA Scheduler",
-        html: passwordResetTemplate(url)
+        html: passwordResetTemplate(resetUrl)
       });
     }
   },
   emailVerification: {
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
+    sendVerificationEmail: async ({ user, token }) => {
+      // Point to the frontend verification page instead of the raw API endpoint.
+      // The frontend page calls the API, handles errors gracefully, and
+      // auto-signs the user in after successful verification.
+      const verificationUrl = `${appURL}/verify-email?token=${token}`;
       logger.info({ email: user.email }, "Sending verification email");
       await sendEmail({
         to: user.email,
         subject: "Verify your email — WA Scheduler",
-        html: verificationTemplate(url)
+        html: verificationTemplate(verificationUrl)
       });
     }
   },

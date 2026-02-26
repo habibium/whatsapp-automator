@@ -1,9 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
-import { CalendarClock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { AuthAlert } from "../components/AuthAlert";
 import { Footer } from "../components/Footer";
-import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -18,6 +18,17 @@ import { Label } from "../components/ui/label";
 import { authClient } from "../lib/auth-client";
 import { useAuthStore } from "../stores/auth";
 
+/** Detect if a Better Auth error message indicates an unverified email */
+function isUnverifiedEmailError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("email is not verified") ||
+    lower.includes("email not verified") ||
+    lower.includes("verify your email") ||
+    lower.includes("email_not_verified")
+  );
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -26,6 +37,7 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   const loginMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
@@ -40,12 +52,22 @@ export function LoginPage() {
     }
   });
 
+  const resendMutation = useMutation({
+    mutationFn: async (userEmail: string) => {
+      const { error } = await authClient.sendVerificationEmail({ email: userEmail });
+      if (error) throw new Error(error.message ?? "Failed to send verification email");
+    },
+    onSuccess: () => setResendSuccess(true)
+  });
+
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
+    setResendSuccess(false);
     loginMutation.mutate({ email, password });
   };
 
-  const error = loginMutation.error?.message ?? null;
+  const errorMsg = loginMutation.error?.message ?? null;
+  const isUnverified = errorMsg ? isUnverifiedEmailError(errorMsg) : false;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -67,10 +89,35 @@ export function LoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error ? (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
+              {/* ── Unverified email alert ── */}
+              {isUnverified ? (
+                <AuthAlert
+                  variant="warning"
+                  message="Your email address hasn't been verified yet. We've sent a new verification link — check your inbox."
+                >
+                  {resendSuccess ? (
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Verification email sent!
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium underline underline-offset-2 opacity-80 transition-opacity hover:opacity-100 disabled:opacity-50"
+                      onClick={() => resendMutation.mutate(email)}
+                      disabled={resendMutation.isPending}
+                    >
+                      {resendMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      Resend verification email
+                    </button>
+                  )}
+                </AuthAlert>
+              ) : errorMsg ? (
+                <AuthAlert variant="error" message={errorMsg} />
               ) : null}
 
               <div className="space-y-2">

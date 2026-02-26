@@ -21,6 +21,7 @@ services:
     environment:
       PORT: 3000
       WEB_DIST_DIR: /app/apps/web/dist
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/whatsapp_scheduler
     ports:
       - "3000:3000"
     depends_on:
