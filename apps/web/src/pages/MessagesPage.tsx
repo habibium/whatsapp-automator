@@ -14,7 +14,6 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Unplug,
   User,
   Users
 } from "lucide-react";
@@ -43,6 +42,7 @@ import {
   TableRow
 } from "../components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
+import { WhatsAppConnect } from "../components/WhatsAppConnect";
 import type { ScheduledMessage } from "../lib/api";
 import { useDeleteMessage, useMessages, useToggleMessage } from "../lib/queries";
 import { useWhatsAppStore } from "../stores/whatsapp";
@@ -100,10 +100,8 @@ export function MessagesPage() {
   const toggleMutation = useToggleMessage();
   const deleteMutation = useDeleteMessage();
   const whatsappStatus = useWhatsAppStore((s) => s.status);
-  const whatsappLoading = useWhatsAppStore((s) => s.loading);
 
   const isConnected = whatsappStatus === "connected";
-  const showDisconnectedBanner = !isConnected && !whatsappLoading;
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -203,16 +201,13 @@ export function MessagesPage() {
                 <div className="flex justify-center">
                   <Switch
                     checked={msg.enabled}
-                    disabled={!isConnected}
                     onCheckedChange={() =>
                       toggleMutation.mutate({ id: msg.id, enabled: !msg.enabled })
                     }
                   />
                 </div>
               </TooltipTrigger>
-              <TooltipContent>
-                {!isConnected ? "Connect WhatsApp first" : msg.enabled ? "Disable" : "Enable"}
-              </TooltipContent>
+              <TooltipContent>{msg.enabled ? "Disable" : "Enable"}</TooltipContent>
             </Tooltip>
           );
         }
@@ -226,19 +221,13 @@ export function MessagesPage() {
             <div className="flex items-center justify-end gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" asChild disabled={!isConnected}>
-                    <Link
-                      to={isConnected ? `/messages/${msg.id}` : "#"}
-                      onClick={(e) => {
-                        if (!isConnected) e.preventDefault();
-                      }}
-                      aria-disabled={!isConnected}
-                    >
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link to={`/messages/${msg.id}`}>
                       <Pencil className="h-4 w-4" />
                     </Link>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{isConnected ? "Edit" : "Connect WhatsApp first"}</TooltipContent>
+                <TooltipContent>Edit</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -247,12 +236,11 @@ export function MessagesPage() {
                     size="icon"
                     className="text-destructive-foreground hover:bg-destructive/10"
                     onClick={() => setDeleteId(msg.id)}
-                    disabled={!isConnected}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{isConnected ? "Delete" : "Connect WhatsApp first"}</TooltipContent>
+                <TooltipContent>Delete</TooltipContent>
               </Tooltip>
             </div>
           );
@@ -260,7 +248,7 @@ export function MessagesPage() {
         enableSorting: false
       }
     ],
-    [toggleMutation, isConnected]
+    [toggleMutation]
   );
 
   const table = useReactTable({
@@ -273,145 +261,115 @@ export function MessagesPage() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Disconnected Banner */}
-      {showDisconnectedBanner && (
-        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
-            <Unplug className="h-4 w-4 text-amber-500" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">WhatsApp not connected</p>
-            <p className="text-xs text-muted-foreground">
-              Connect your WhatsApp to create, edit, or manage scheduled messages.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Scheduled Messages</h1>
-          <p className="mt-1 text-muted-foreground">Manage your automated WhatsApp messages</p>
-        </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={!isConnected ? 0 : undefined}>
-              <Button asChild={isConnected} disabled={!isConnected}>
-                {isConnected ? (
-                  <Link to="/messages/new">
-                    <Plus className="size-4" />
-                    New Message
-                  </Link>
-                ) : (
-                  <>
-                    <Plus className="size-4" />
-                    New Message
-                  </>
-                )}
-              </Button>
-            </span>
-          </TooltipTrigger>
-          {!isConnected && (
-            <TooltipContent>Connect WhatsApp first to create messages</TooltipContent>
-          )}
-        </Tooltip>
-      </div>
-
-      {error ? (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Failed to load messages</AlertTitle>
-          <AlertDescription>
-            Something went wrong while fetching your messages. Please try again.
-          </AlertDescription>
-        </Alert>
-      ) : isLoading ? (
-        <TableSkeleton />
-      ) : messages.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Inbox className="h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mt-4 text-lg font-semibold">No Scheduled Messages</h3>
-            <p className="mt-1 text-center text-sm text-muted-foreground">
-              {isConnected
-                ? "Create your first scheduled message to start automating your WhatsApp communications."
-                : "Connect your WhatsApp account first, then create scheduled messages."}
-            </p>
-            {isConnected ? (
-              <Button asChild className="mt-4">
-                <Link to="/messages/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Message
-                </Link>
-              </Button>
-            ) : (
-              <Button className="mt-4" disabled>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Message
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+    <>
+      {/* Show connection screen when not connected */}
+      {!isConnected ? (
+        <WhatsAppConnect />
       ) : (
-        <Card className="py-0">
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Scheduled Messages</h1>
+              <p className="mt-1 text-muted-foreground">Manage your automated WhatsApp messages</p>
+            </div>
+            <Button asChild>
+              <Link to="/messages/new">
+                <Plus className="size-4" />
+                New Message
+              </Link>
+            </Button>
+          </div>
 
-      {/* Delete confirmation dialog */}
-      <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete scheduled message?</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. The scheduled message will be permanently deleted.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteId(null)}
-              disabled={deleteMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          {error ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Failed to load messages</AlertTitle>
+              <AlertDescription>
+                Something went wrong while fetching your messages. Please try again.
+              </AlertDescription>
+            </Alert>
+          ) : isLoading ? (
+            <TableSkeleton />
+          ) : messages.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <Inbox className="h-12 w-12 text-muted-foreground/50" />
+                <h3 className="mt-4 text-lg font-semibold">No Scheduled Messages</h3>
+                <p className="mt-1 text-center text-sm text-muted-foreground">
+                  Create your first scheduled message to start automating your WhatsApp
+                  communications.
+                </p>
+                <Button asChild className="mt-4">
+                  <Link to="/messages/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Message
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="py-0">
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id} colSpan={header.colSpan}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(header.column.columnDef.header, header.getContext())}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows.map((row) => (
+                    <TableRow key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+
+          {/* Delete confirmation dialog */}
+          <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete scheduled message?</DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone. The scheduled message will be permanently deleted.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteId(null)}
+                  disabled={deleteMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+    </>
   );
 }
