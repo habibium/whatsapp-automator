@@ -32,6 +32,13 @@ whatsappRoutes.get("/qr", async (c) => {
           event: "message"
         });
       },
+      onConnecting: async () => {
+        if (closed) return;
+        await stream.writeSSE({
+          data: JSON.stringify({ type: "connecting" }),
+          event: "message"
+        });
+      },
       onConnected: async () => {
         if (closed) return;
         await stream.writeSSE({ data: JSON.stringify({ type: "connected" }), event: "message" });

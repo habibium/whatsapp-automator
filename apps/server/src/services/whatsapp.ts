@@ -23,6 +23,7 @@ import {
 
 type ConnectionEventHandler = {
   onQR: (qr: string) => void;
+  onConnecting: () => void;
   onConnected: () => void;
   onDisconnected: (reason?: string) => void;
 };
@@ -33,6 +34,8 @@ type UserConnection = {
   lastQR: string | null;
   eventHandlers: Set<ConnectionEventHandler>;
   intentionalDisconnect: boolean;
+  /** When true, the connection.update handler should skip all processing — logout() handles cleanup */
+  loggingOut: boolean;
 };
 
 class WhatsAppService {
@@ -46,7 +49,8 @@ class WhatsAppService {
         status: "disconnected",
         lastQR: null,
         eventHandlers: new Set(),
-        intentionalDisconnect: false
+        intentionalDisconnect: false,
+        loggingOut: false
       };
       this.connections.set(userId, conn);
     }
@@ -60,6 +64,8 @@ class WhatsAppService {
     // Replay current state to the new handler
     if (conn.status === "awaiting_qr" && conn.lastQR) {
       handler.onQR(conn.lastQR);
+    } else if (conn.status === "connecting") {
+      handler.onConnecting();
     } else if (conn.status === "connected") {
       handler.onConnected();
     }
@@ -74,8 +80,8 @@ class WhatsAppService {
   async connect(userId: string): Promise<void> {
     const conn = this.getOrCreateConnection(userId);
 
-    if (conn.status === "connected" || conn.status === "connecting") {
-      logger.debug({ userId }, "Already connected or connecting");
+    if (conn.status === "connected" || conn.status === "awaiting_qr") {
+      logger.debug({ userId }, "Already connected or awaiting QR");
       return;
     }
 
@@ -97,6 +103,9 @@ class WhatsAppService {
     socket.ev.on("creds.update", saveCreds);
 
     socket.ev.on("connection.update", async (update) => {
+      // Skip processing if logout() is handling cleanup
+      if (conn.loggingOut) return;
+
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
@@ -114,7 +123,6 @@ class WhatsAppService {
         const wasIntentional = conn.intentionalDisconnect;
         const reason = (lastDisconnect?.error as Error)?.message ?? "Unknown";
 
-        conn.status = "disconnected";
         conn.socket = null;
         conn.lastQR = null;
 
@@ -124,16 +132,23 @@ class WhatsAppService {
           await clearWhatsAppAuthState(userId);
         }
 
-        await updateWhatsAppStatus(userId, "disconnected");
+        const willAutoReconnect = !wasIntentional && !isLoggedOut;
 
-        for (const handler of conn.eventHandlers) {
-          handler.onDisconnected(reason);
-        }
-
-        // Only auto-reconnect if NOT intentional and NOT logged out
-        if (!wasIntentional && !isLoggedOut) {
+        if (willAutoReconnect) {
+          // Show "connecting" state instead of "disconnected" during auto-reconnect
+          conn.status = "connecting";
+          await updateWhatsAppStatus(userId, "connecting");
+          for (const handler of conn.eventHandlers) {
+            handler.onConnecting();
+          }
           logger.info({ userId }, "Reconnecting after unexpected disconnect");
           setTimeout(() => this.connect(userId), 3000);
+        } else {
+          conn.status = "disconnected";
+          await updateWhatsAppStatus(userId, "disconnected");
+          for (const handler of conn.eventHandlers) {
+            handler.onDisconnected(reason);
+          }
         }
       } else if (connection === "open") {
         conn.status = "connected";
@@ -171,25 +186,86 @@ class WhatsAppService {
   }
 
   async logout(userId: string): Promise<void> {
-    const conn = this.connections.get(userId);
-    if (conn) {
-      conn.intentionalDisconnect = true;
-      if (conn.socket) {
-        try {
-          await conn.socket.logout();
-        } catch (error) {
-          logger.debug({ userId, error }, "Error during socket.logout (ignored)");
-        }
-        conn.socket = null;
-      }
-      conn.status = "disconnected";
-      conn.lastQR = null;
-      await clearWhatsAppAuthState(userId);
-      await updateWhatsAppStatus(userId, "disconnected");
+    const conn = this.getOrCreateConnection(userId);
+    conn.intentionalDisconnect = true;
+    conn.loggingOut = true;
 
-      for (const handler of conn.eventHandlers) {
-        handler.onDisconnected("Logged out");
+    let socket = conn.socket;
+
+    // If there's no active socket, create a temporary one using the saved auth
+    // state so we can send the logout/unlink request to WhatsApp's servers.
+    if (!socket) {
+      try {
+        const { state, saveCreds } = await this.createAuthState(userId);
+        const { version } = await fetchLatestBaileysVersion();
+
+        socket = makeWASocket({
+          version,
+          auth: state,
+          logger: pino({ level: "silent" })
+        });
+
+        socket.ev.on("creds.update", saveCreds);
+
+        // Wait for the connection to open (or fail) before issuing logout
+        const connected = await new Promise<boolean>((resolve) => {
+          const timeout = setTimeout(() => resolve(false), 15000);
+          socket!.ev.on("connection.update", (update) => {
+            if (update.connection === "open") {
+              clearTimeout(timeout);
+              resolve(true);
+            } else if (update.connection === "close") {
+              clearTimeout(timeout);
+              resolve(false);
+            }
+          });
+        });
+
+        if (!connected) {
+          logger.warn({ userId }, "Temporary socket failed to connect for logout");
+          try {
+            socket.end(undefined);
+          } catch {
+            /* ignore */
+          }
+          socket = null;
+        }
+      } catch (error) {
+        logger.warn({ userId, error }, "Failed to create temporary socket for logout");
+        socket = null;
       }
+    }
+
+    // Issue the actual logout request to WhatsApp to unlink the device
+    if (socket) {
+      try {
+        await socket.logout();
+        logger.info({ userId }, "WhatsApp logout request sent successfully");
+      } catch (error) {
+        logger.warn({ userId, error }, "Error during socket.logout");
+        // Even if logout() throws, try to end the socket gracefully
+        try {
+          socket.end(undefined);
+        } catch {
+          /* ignore */
+        }
+      }
+    } else {
+      logger.warn(
+        { userId },
+        "No socket available for WhatsApp logout — only clearing local state"
+      );
+    }
+
+    conn.socket = null;
+    conn.status = "disconnected";
+    conn.lastQR = null;
+    conn.loggingOut = false;
+    await clearWhatsAppAuthState(userId);
+    await updateWhatsAppStatus(userId, "disconnected");
+
+    for (const handler of conn.eventHandlers) {
+      handler.onDisconnected("Logged out");
     }
   }
 

@@ -3,6 +3,7 @@ import { buildApiUrl, type WhatsAppStatus, whatsappApi } from "../lib/api";
 
 type QREvent =
   | { type: "qr"; data: string }
+  | { type: "connecting" }
   | { type: "connected" }
   | { type: "disconnected"; reason?: string };
 
@@ -54,6 +55,8 @@ export const useWhatsAppStore = create<WhatsAppState>()((set, get) => ({
         const parsed = JSON.parse(event.data) as QREvent;
         if (parsed.type === "qr") {
           set({ status: "awaiting_qr", qrCode: parsed.data, loading: false });
+        } else if (parsed.type === "connecting") {
+          set({ status: "connecting", qrCode: null, loading: false });
         } else if (parsed.type === "connected") {
           set({ status: "connected", qrCode: null, loading: false });
           // Don't close SSE — keep listening for unexpected disconnects
