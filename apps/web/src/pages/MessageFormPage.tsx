@@ -1,3 +1,4 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AlertCircle,
   ArrowLeft,
@@ -9,16 +10,24 @@ import {
   User,
   Users
 } from "lucide-react";
-import { type SubmitEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
+import { z } from "zod";
 import { CronScheduleBuilder } from "../components/CronScheduleBuilder";
 import { GroupCombobox } from "../components/GroupCombobox";
 import { TemplateVariableChips } from "../components/TemplateVariableChips";
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel
+} from "../components/ui/field";
 import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
 import { Skeleton } from "../components/ui/skeleton";
 import { Switch } from "../components/ui/switch";
 import { Textarea } from "../components/ui/textarea";
@@ -30,6 +39,28 @@ import {
   useWhatsAppGroups
 } from "../lib/queries";
 import { useWhatsAppStore } from "../stores/whatsapp";
+
+// ── Zod Schema ─────────────────────────────────────────────────────
+
+const messageFormSchema = z.object({
+  target: z.string().min(1, { error: "Recipient is required" }),
+  isGroup: z.boolean(),
+  message: z.string().min(1, { error: "Message content is required" }),
+  cronExpression: z.string().min(1, { error: "Schedule is required" }),
+  enabled: z.boolean()
+});
+
+type MessageFormValues = z.infer<typeof messageFormSchema>;
+
+const defaultValues: MessageFormValues = {
+  target: "",
+  isGroup: false,
+  message: "",
+  cronExpression: "0 9 * * *",
+  enabled: true
+};
+
+// ── Skeleton ───────────────────────────────────────────────────────
 
 function FormSkeleton() {
   return (
@@ -58,6 +89,8 @@ function FormSkeleton() {
   );
 }
 
+// ── Page Component ─────────────────────────────────────────────────
+
 export function MessageFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -73,13 +106,14 @@ export function MessageFormPage() {
   const createMutation = useCreateMessage();
   const updateMutation = useUpdateMessage();
 
-  // Form state
-  const [target, setTarget] = useState("");
-  const [isGroup, setIsGroup] = useState(false);
-  const [messageText, setMessageText] = useState("");
-  const [cronExpression, setCronExpression] = useState("0 9 * * *");
-  const [enabled, setEnabled] = useState(true);
-  const [formReady, setFormReady] = useState(!isEditing);
+  // React Hook Form
+  const form = useForm<MessageFormValues>({
+    resolver: zodResolver(messageFormSchema),
+    defaultValues
+  });
+
+  const isGroup = form.watch("isGroup");
+  const messageText = form.watch("message");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -91,50 +125,45 @@ export function MessageFormPage() {
 
   // Populate form when existing message loads
   useEffect(() => {
-    if (existingMessage && !formReady) {
-      setTarget(existingMessage.target);
-      setIsGroup(existingMessage.isGroup);
-      setMessageText(existingMessage.message);
-      setCronExpression(existingMessage.cronExpression);
-      setEnabled(existingMessage.enabled);
-      setFormReady(true);
+    if (existingMessage) {
+      form.reset({
+        target: existingMessage.target,
+        isGroup: existingMessage.isGroup,
+        message: existingMessage.message,
+        cronExpression: existingMessage.cronExpression,
+        enabled: existingMessage.enabled
+      });
     }
-  }, [existingMessage, formReady]);
+  }, [existingMessage, form]);
 
-  const handleInsertVariable = useCallback((variable: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      setMessageText((prev) => prev + variable);
-      return;
-    }
+  const handleInsertVariable = useCallback(
+    (variable: string) => {
+      const textarea = textareaRef.current;
+      if (!textarea) {
+        const current = form.getValues("message");
+        form.setValue("message", current + variable, { shouldValidate: true });
+        return;
+      }
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const before = textarea.value.substring(0, start);
-    const after = textarea.value.substring(end);
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+      const newValue = value.substring(0, start) + variable + value.substring(end);
 
-    setMessageText(before + variable + after);
+      form.setValue("message", newValue, { shouldValidate: true });
 
-    requestAnimationFrame(() => {
-      const newPos = start + variable.length;
-      textarea.focus();
-      textarea.setSelectionRange(newPos, newPos);
-    });
-  }, []);
+      requestAnimationFrame(() => {
+        const newPos = start + variable.length;
+        textarea.focus();
+        textarea.setSelectionRange(newPos, newPos);
+      });
+    },
+    [form]
+  );
 
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  const handleSubmit = (e: SubmitEvent) => {
-    e.preventDefault();
-
-    const data = {
-      target,
-      isGroup,
-      message: messageText,
-      cronExpression,
-      enabled
-    };
-
+  const onSubmit = (data: MessageFormValues) => {
     const onSuccess = () => navigate("/");
 
     if (isEditing && id) {
@@ -222,7 +251,7 @@ export function MessageFormPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {mutationError ? (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -242,63 +271,77 @@ export function MessageFormPage() {
             <CardDescription>Choose who will receive this message</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={!isGroup ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setIsGroup(false);
-                    setTarget("");
-                  }}
-                  className="flex-1"
-                >
-                  <User className="size-4" />
-                  Contact
-                </Button>
-                <Button
-                  type="button"
-                  variant={isGroup ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setIsGroup(true);
-                    setTarget("");
-                  }}
-                  className="flex-1"
-                >
-                  <Users className="size-4" />
-                  Group
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="target">{isGroup ? "Group Name" : "Phone Number"}</Label>
-              {isGroup ? (
-                <GroupCombobox
-                  value={target}
-                  onChange={setTarget}
-                  groups={groups}
-                  loading={loadingGroups}
-                />
-              ) : (
-                <Input
-                  id="target"
-                  type="tel"
-                  placeholder="+1234567890"
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value)}
-                  required
-                />
+            <Controller
+              name="isGroup"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Type</FieldLabel>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={!field.value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        field.onChange(false);
+                        form.setValue("target", "");
+                      }}
+                      className="flex-1"
+                    >
+                      <User className="size-4" />
+                      Contact
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={field.value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        field.onChange(true);
+                        form.setValue("target", "");
+                      }}
+                      className="flex-1"
+                    >
+                      <Users className="size-4" />
+                      Group
+                    </Button>
+                  </div>
+                </Field>
               )}
-              <p className="text-xs text-muted-foreground">
-                {isGroup
-                  ? "Search from your groups or type a custom group name"
-                  : "Include country code without spaces or dashes"}
-              </p>
-            </div>
+            />
+
+            <Controller
+              name="target"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    {isGroup ? "Group Name" : "Phone Number"}
+                  </FieldLabel>
+                  {isGroup ? (
+                    <GroupCombobox
+                      value={field.value}
+                      onChange={field.onChange}
+                      groups={groups}
+                      loading={loadingGroups}
+                    />
+                  ) : (
+                    <Input
+                      {...field}
+                      id={field.name}
+                      type="tel"
+                      placeholder="+1234567890"
+                      aria-invalid={fieldState.invalid}
+                    />
+                  )}
+                  <FieldDescription>
+                    {isGroup
+                      ? "Search from your groups or type a custom group name"
+                      : "Include country code without spaces or dashes"}
+                  </FieldDescription>
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
           </CardContent>
         </Card>
 
@@ -312,20 +355,33 @@ export function MessageFormPage() {
             <CardDescription>Write the content that will be sent</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="message">Content</Label>
-              <Textarea
-                ref={textareaRef}
-                id="message"
-                placeholder="Type your message here..."
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                required
-                rows={5}
-                className="resize-y font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">{messageText.length} characters</p>
-            </div>
+            <Controller
+              name="message"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Content</FieldLabel>
+                  <Textarea
+                    ref={(el) => {
+                      field.ref(el);
+                      (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+                        el;
+                    }}
+                    id={field.name}
+                    name={field.name}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    placeholder="Type your message here..."
+                    rows={5}
+                    aria-invalid={fieldState.invalid}
+                    className="resize-y font-mono text-sm"
+                  />
+                  <FieldDescription>{messageText.length} characters</FieldDescription>
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
             <TemplateVariableChips onInsert={handleInsertVariable} />
           </CardContent>
         </Card>
@@ -355,24 +411,44 @@ export function MessageFormPage() {
             <CardDescription>Define when this message should be sent</CardDescription>
           </CardHeader>
           <CardContent>
-            <CronScheduleBuilder
-              value={cronExpression}
-              onChange={setCronExpression}
-              serverTimezone={serverTimezone}
+            <Controller
+              name="cronExpression"
+              control={form.control}
+              render={({ field }) => (
+                <CronScheduleBuilder
+                  value={field.value}
+                  onChange={field.onChange}
+                  serverTimezone={serverTimezone}
+                />
+              )}
             />
           </CardContent>
         </Card>
 
         {/* Enabled toggle */}
         <Card>
-          <CardContent className="flex items-center justify-between py-4">
-            <div>
-              <p className="text-sm font-medium">Enabled</p>
-              <p className="text-xs text-muted-foreground">
-                Schedule will run automatically when enabled
-              </p>
-            </div>
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
+          <CardContent className="py-4">
+            <Controller
+              name="enabled"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field orientation="horizontal" data-invalid={fieldState.invalid}>
+                  <FieldContent>
+                    <FieldLabel htmlFor={field.name}>Enabled</FieldLabel>
+                    <FieldDescription>
+                      Schedule will run automatically when enabled
+                    </FieldDescription>
+                  </FieldContent>
+                  <Switch
+                    id={field.name}
+                    name={field.name}
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    aria-invalid={fieldState.invalid}
+                  />
+                </Field>
+              )}
+            />
           </CardContent>
         </Card>
 
