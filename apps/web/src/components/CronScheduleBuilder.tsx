@@ -1,3 +1,5 @@
+import { Cron } from "croner";
+import cronstrue from "cronstrue";
 import { format } from "date-fns";
 import { CalendarDays, Clock, Code2, Globe, Info, Repeat, Timer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -316,157 +318,22 @@ function parseCronToState(cron: string): ParsedState {
 }
 
 // ─── Describe Cron ──────────────────────────────────────────────────
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December"
-];
-
 export function describeCron(cron: string): string {
   if (!cron) return "No schedule set";
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5 && parts.length !== 6) return "Invalid schedule";
 
-  const [second, minute, hour, dayOfMonth, month, dayOfWeek] =
-    parts.length === 6 ? parts : ["0", ...parts];
-
-  if (
-    second === "*" &&
-    minute === "*" &&
-    hour === "*" &&
-    dayOfMonth === "*" &&
-    month === "*" &&
-    dayOfWeek === "*"
-  ) {
-    return "Every second";
+  try {
+    return cronstrue.toString(cron, {
+      use24HourTimeFormat: false,
+      verbose: true
+    });
+  } catch {
+    return `Runs at: ${cron}`;
   }
-
-  if (
-    second?.startsWith("*/") &&
-    minute === "*" &&
-    hour === "*" &&
-    dayOfMonth === "*" &&
-    month === "*" &&
-    dayOfWeek === "*"
-  ) {
-    return `Every ${second.slice(2)} seconds`;
-  }
-
-  if (
-    (second === "0" || second === "*") &&
-    minute === "*" &&
-    hour === "*" &&
-    dayOfMonth === "*" &&
-    month === "*" &&
-    dayOfWeek === "*"
-  ) {
-    return "Every minute";
-  }
-
-  if (
-    (second === "0" || second === "*") &&
-    minute?.startsWith("*/") &&
-    hour === "*" &&
-    dayOfMonth === "*" &&
-    month === "*" &&
-    dayOfWeek === "*"
-  ) {
-    return `Every ${minute.slice(2)} minutes`;
-  }
-
-  if (
-    (second === "0" || second === "*") &&
-    hour?.startsWith("*/") &&
-    dayOfMonth === "*" &&
-    month === "*" &&
-    dayOfWeek === "*"
-  ) {
-    const m = Number.parseInt(minute ?? "0", 10);
-    return `Every ${hour.slice(2)} hours${m > 0 ? ` at minute :${String(m).padStart(2, "0")}` : ""}`;
-  }
-
-  if (
-    (second === "0" || second === "*") &&
-    hour === "*" &&
-    dayOfMonth === "*" &&
-    month === "*" &&
-    dayOfWeek === "*"
-  ) {
-    const m = Number.parseInt(minute ?? "0", 10);
-    return m === 0 ? "Every hour on the hour" : `Every hour at :${String(m).padStart(2, "0")}`;
-  }
-
-  const s = Number.parseInt(second ?? "0", 10);
-  const h = Number.parseInt(hour ?? "0", 10);
-  const m = Number.parseInt(minute ?? "0", 10);
-  const timeStr = formatTime(h, m, s);
-
-  if (
-    month !== "*" &&
-    !month?.startsWith("*/") &&
-    dayOfMonth !== "*" &&
-    !dayOfMonth?.startsWith("*/") &&
-    dayOfWeek === "*"
-  ) {
-    const mo = Number.parseInt(month ?? "1", 10);
-    const d = Number.parseInt(dayOfMonth ?? "1", 10);
-    const monthName = MONTH_NAMES[mo - 1] ?? month;
-    return `Once on ${monthName} ${d} at ${timeStr}`;
-  }
-
-  if (dayOfMonth?.startsWith("*/") && month === "*" && dayOfWeek === "*") {
-    return `Every ${dayOfMonth.slice(2)} days at ${timeStr}`;
-  }
-
-  if (dayOfMonth === "*" && dayOfWeek !== "*" && month === "*" && dayOfWeek?.includes(",")) {
-    const days = dayOfWeek.split(",").map((d) => getDayName(d.trim()));
-    return `Every ${days.join(", ")} at ${timeStr}`;
-  }
-
-  if (dayOfMonth === "*" && dayOfWeek !== "*" && month === "*") {
-    const dayName = getDayName(dayOfWeek ?? "0");
-    if (dayOfWeek?.includes("-")) {
-      const [start, end] = dayOfWeek.split("-");
-      return `${getDayName(start ?? "0")} through ${getDayName(end ?? "0")} at ${timeStr}`;
-    }
-    return `Every ${dayName} at ${timeStr}`;
-  }
-
-  if (dayOfMonth !== "*" && month?.startsWith("*/") && dayOfWeek === "*") {
-    const d = Number.parseInt(dayOfMonth ?? "1", 10);
-    return `Every ${month.slice(2)} months on the ${getOrdinal(d)} at ${timeStr}`;
-  }
-
-  if (dayOfMonth !== "*" && dayOfWeek === "*" && month === "*") {
-    const d = Number.parseInt(dayOfMonth ?? "1", 10);
-    return `Monthly on the ${getOrdinal(d)} at ${timeStr}`;
-  }
-
-  if (dayOfMonth === "*" && dayOfWeek === "*" && month === "*") {
-    return `Every day at ${timeStr}`;
-  }
-
-  return `Runs at: ${cron}`;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
-function formatTime(hour: number, minute: number, second = 0): string {
-  const period = hour >= 12 ? "PM" : "AM";
-  const h = hour % 12 || 12;
-  const m = String(minute).padStart(2, "0");
-  const s = String(second).padStart(2, "0");
-  return second > 0 ? `${h}:${m}:${s} ${period}` : `${h}:${m} ${period}`;
-}
-
 function getDayName(day: string): string {
   const names: Record<string, string> = {
     "0": "Sunday",
@@ -947,6 +814,17 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
   const description = describeCron(value);
   const manualValid = isValidCron(manualCron);
 
+  const nextRuns = useMemo(() => {
+    if (!value) return [];
+    try {
+      const opts = serverTimezone?.timezone ? { timezone: serverTimezone.timezone } : undefined;
+      const job = new Cron(value, opts);
+      return job.nextRuns(3);
+    } catch {
+      return [];
+    }
+  }, [value, serverTimezone?.timezone]);
+
   const tzLabel = serverTimezone ? `${serverTimezone.timezone} (${serverTimezone.offset})` : null;
 
   return (
@@ -1130,13 +1008,31 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
       {/* ── Description with server timezone ── */}
       <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 border border-border/50 px-3.5 py-3">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           <p className="text-sm text-foreground/80">{description}</p>
           {tzLabel && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Globe className="h-3 w-3" />
               {tzLabel}
             </p>
+          )}
+          {nextRuns.length > 0 && (
+            <div className="mt-1.5 border-t border-border/40 pt-2 space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">
+                Upcoming runs <span className="font-normal opacity-70">(preview)</span>
+              </p>
+              <ul className="text-xs text-muted-foreground space-y-0.5">
+                {nextRuns.map((date) => (
+                  <li key={date.toISOString()} className="flex items-center gap-1.5">
+                    <span className="size-1 rounded-full bg-primary/50" />
+                    {format(date, "EEE, MMM d, yyyy 'at' h:mm a")}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-muted-foreground/60 italic">
+                Schedule continues indefinitely while enabled
+              </p>
+            </div>
           )}
         </div>
       </div>
