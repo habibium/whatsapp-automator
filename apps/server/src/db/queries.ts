@@ -66,7 +66,9 @@ export async function createScheduledMessage(
     target: string;
     isGroup: boolean;
     message: string;
-    cronExpression: string;
+    scheduleType?: string;
+    cronExpression?: string | null;
+    scheduledAt?: Date | null;
     enabled?: boolean;
   }
 ) {
@@ -84,7 +86,9 @@ export async function updateScheduledMessage(
     target: string;
     isGroup: boolean;
     message: string;
-    cronExpression: string;
+    scheduleType: string;
+    cronExpression: string | null;
+    scheduledAt: Date | null;
     enabled: boolean;
   }>
 ) {

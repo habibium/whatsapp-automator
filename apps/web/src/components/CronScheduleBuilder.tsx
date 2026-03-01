@@ -22,9 +22,15 @@ import { Separator } from "./ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 // ─── Types ──────────────────────────────────────────────────────────
+export type ScheduleValue = {
+  scheduleType: "once" | "recurring";
+  cronExpression: string | null;
+  scheduledAt: string | null;
+};
+
 type CronScheduleBuilderProps = {
-  value: string;
-  onChange: (value: string) => void;
+  value: ScheduleValue;
+  onChange: (value: ScheduleValue) => void;
   /** Server timezone info e.g. { timezone: "Asia/Dhaka", offset: "GMT+6" } */
   serverTimezone?: { timezone: string; offset: string } | null | undefined;
 };
@@ -95,17 +101,6 @@ function buildCron(
     case "every-n-months":
       return `${m} ${h} ${dom} */${n} *`;
   }
-}
-
-function buildOnceCron(date: Date | undefined, time: string): string {
-  if (!date || !time) return "";
-  const month = String(date.getMonth() + 1);
-  const day = String(date.getDate());
-  const [hours, minutes, seconds] = time.split(":");
-  const h = String(Number.parseInt(hours ?? "0", 10));
-  const m = String(Number.parseInt(minutes ?? "0", 10));
-  const sec = String(Number.parseInt(seconds ?? "0", 10));
-  return `${sec} ${m} ${h} ${day} ${month} *`;
 }
 
 // ─── Cron Parser ────────────────────────────────────────────────────
@@ -206,26 +201,6 @@ function parseCronToState(cron: string): ParsedState {
     };
   }
 
-  // Specific month + day → "once" schedule
-  if (
-    month !== "*" &&
-    !month?.startsWith("*/") &&
-    dayOfMonth !== "*" &&
-    !dayOfMonth?.startsWith("*/") &&
-    dayOfWeek === "*"
-  ) {
-    const h = Number.parseInt(hour ?? "0", 10);
-    const m = Number.parseInt(minute ?? "0", 10);
-    const s = Number.parseInt(second ?? "0", 10);
-    const mo = Number.parseInt(month ?? "1", 10);
-    const d = Number.parseInt(dayOfMonth ?? "1", 10);
-    const now = new Date();
-    const year = now.getFullYear();
-    const onceDate = new Date(year, mo - 1, d);
-    const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-    return { ...defaults, scheduleMode: "once", onceDate, onceTime: timeStr };
-  }
-
   // Every N days
   if (
     (second === "0" || second === "*") &&
@@ -317,6 +292,28 @@ function parseCronToState(cron: string): ParsedState {
   };
 }
 
+function parseScheduleValueToState(value: ScheduleValue): ParsedState {
+  if (value.scheduleType === "once" && value.scheduledAt) {
+    const date = new Date(value.scheduledAt);
+    const h = String(date.getHours()).padStart(2, "0");
+    const m = String(date.getMinutes()).padStart(2, "0");
+    const s = String(date.getSeconds()).padStart(2, "0");
+    return {
+      scheduleMode: "once",
+      frequency: "daily",
+      minute: "0",
+      hour: "9",
+      dayOfMonth: "1",
+      weekdays: ["1"],
+      intervalN: "2",
+      onceDate: date,
+      onceTime: `${h}:${m}:${s}`
+    };
+  }
+  const parsed = parseCronToState(value.cronExpression ?? "");
+  return { ...parsed, scheduleMode: "recurring" };
+}
+
 // ─── Describe Cron ──────────────────────────────────────────────────
 export function describeCron(cron: string): string {
   if (!cron) return "No schedule set";
@@ -331,6 +328,14 @@ export function describeCron(cron: string): string {
   } catch {
     return `Runs at: ${cron}`;
   }
+}
+
+export function describeSchedule(value: ScheduleValue): string {
+  if (value.scheduleType === "once" && value.scheduledAt) {
+    const date = new Date(value.scheduledAt);
+    return `Once on ${format(date, "PPP 'at' h:mm:ss a")}`;
+  }
+  return describeCron(value.cronExpression ?? "");
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -366,6 +371,17 @@ function clampN(val: string, min: number, max: number): string {
   const n = Number.parseInt(val, 10);
   if (Number.isNaN(n)) return String(min);
   return String(Math.max(min, Math.min(max, n)));
+}
+
+function buildScheduledAt(date: Date | undefined, time: string): string | null {
+  if (!date || !time) return null;
+  const [hours, minutes, seconds] = time.split(":");
+  const h = Number.parseInt(hours ?? "0", 10);
+  const m = Number.parseInt(minutes ?? "0", 10);
+  const s = Number.parseInt(seconds ?? "0", 10);
+  const result = new Date(date);
+  result.setHours(h, m, s, 0);
+  return result.toISOString();
 }
 
 // ─── Sub-Components ─────────────────────────────────────────────────
@@ -647,11 +663,11 @@ function FrequencySelect({
 // ─── Main Component ─────────────────────────────────────────────────
 
 export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronScheduleBuilderProps) {
-  const parsed = useMemo(() => parseCronToState(value), [value]);
+  const parsed = useMemo(() => parseScheduleValueToState(value), [value]);
 
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(parsed.scheduleMode);
   const [manualMode, setManualMode] = useState(false);
-  const [manualCron, setManualCron] = useState(value);
+  const [manualCron, setManualCron] = useState(value.cronExpression ?? "");
 
   // Once mode
   const [onceDate, setOnceDate] = useState<Date | undefined>(parsed.onceDate);
@@ -667,7 +683,7 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
 
   // Sync from external value changes (edit mode)
   useEffect(() => {
-    const p = parseCronToState(value);
+    const p = parseScheduleValueToState(value);
     setScheduleMode(p.scheduleMode);
     setFrequency(p.frequency);
     setMinute(p.minute);
@@ -677,31 +693,25 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
     setIntervalN(p.intervalN);
     setOnceDate(p.onceDate);
     setOnceTime(p.onceTime);
-    setManualCron(value);
+    setManualCron(value.cronExpression ?? "");
   }, [value]);
 
-  const emitCron = useCallback(
-    (newCron: string) => {
-      if (newCron && newCron !== value) {
-        onChange(newCron);
+  const emitOnce = useCallback(
+    (date: Date | undefined, time: string) => {
+      const scheduledAt = buildScheduledAt(date, time);
+      if (scheduledAt) {
+        onChange({ scheduleType: "once", cronExpression: null, scheduledAt });
       }
     },
-    [onChange, value]
+    [onChange]
   );
 
   const emitRecurring = useCallback(
     (f: Frequency, m: string, h: string, dom: string, wd: string[], n: string) => {
-      emitCron(buildCron(f, m, h, dom, wd, n));
+      const cronExpr = buildCron(f, m, h, dom, wd, n);
+      onChange({ scheduleType: "recurring", cronExpression: cronExpr, scheduledAt: null });
     },
-    [emitCron]
-  );
-
-  const emitOnce = useCallback(
-    (date: Date | undefined, time: string) => {
-      const cron = buildOnceCron(date, time);
-      if (cron) emitCron(cron);
-    },
-    [emitCron]
+    [onChange]
   );
 
   // ── Handlers ──
@@ -762,7 +772,7 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
   const handleManualCron = (c: string) => {
     setManualCron(c);
     if (isValidCron(c)) {
-      emitCron(c);
+      onChange({ scheduleType: "recurring", cronExpression: c, scheduledAt: null });
     }
   };
 
@@ -811,14 +821,25 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
     "every-n-months": 12
   };
 
-  const description = describeCron(value);
+  const description =
+    value.scheduleType === "once"
+      ? value.scheduledAt
+        ? `Once on ${format(new Date(value.scheduledAt), "PPP 'at' h:mm:ss a")}`
+        : "No date selected"
+      : describeCron(value.cronExpression ?? "");
+
   const manualValid = isValidCron(manualCron);
 
   const nextRuns = useMemo(() => {
-    if (!value) return [];
+    if (value.scheduleType === "once") {
+      if (!value.scheduledAt) return [];
+      const date = new Date(value.scheduledAt);
+      return date.getTime() > Date.now() ? [date] : [];
+    }
+    if (!value.cronExpression) return [];
     try {
       const opts = serverTimezone?.timezone ? { timezone: serverTimezone.timezone } : undefined;
-      const job = new Cron(value, opts);
+      const job = new Cron(value.cronExpression, opts);
       return job.nextRuns(3);
     } catch {
       return [];
@@ -943,7 +964,7 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
         </div>
       )}
 
-      {/* ── Manual Cron Mode ── */}
+      {/* ── Manual Cron Mode (only for recurring) ── */}
       {manualMode && (
         <div className="space-y-3">
           <div className="space-y-2">
@@ -969,41 +990,43 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
 
       <Separator />
 
-      {/* ── Manual Toggle ── */}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => {
-            setManualMode(!manualMode);
-            if (!manualMode) {
-              setManualCron(value);
-            } else {
-              const p = parseCronToState(manualCron || value);
-              setScheduleMode(p.scheduleMode);
-              setFrequency(p.frequency);
-              setMinute(p.minute);
-              setHour(p.hour);
-              setDayOfMonth(p.dayOfMonth);
-              setWeekdays(p.weekdays);
-              setIntervalN(p.intervalN);
-              setOnceDate(p.onceDate);
-              setOnceTime(p.onceTime);
-            }
-          }}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 cursor-pointer"
-        >
-          <Code2 className="h-3.5 w-3.5" />
-          {manualMode ? "Use visual builder" : "Enter cron manually"}
-        </button>
-
-        {manualMode && manualCron && (
-          <span
-            className={cn("text-xs font-medium", manualValid ? "text-primary" : "text-destructive")}
+      {/* ── Manual Toggle (only show for recurring mode) ── */}
+      {scheduleMode === "recurring" && (
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setManualMode(!manualMode);
+              if (!manualMode) {
+                setManualCron(value.cronExpression ?? "");
+              } else {
+                const p = parseCronToState(manualCron || value.cronExpression || "");
+                setFrequency(p.frequency);
+                setMinute(p.minute);
+                setHour(p.hour);
+                setDayOfMonth(p.dayOfMonth);
+                setWeekdays(p.weekdays);
+                setIntervalN(p.intervalN);
+              }
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            {manualValid ? "Valid" : "Invalid"}
-          </span>
-        )}
-      </div>
+            <Code2 className="h-3.5 w-3.5" />
+            {manualMode ? "Use visual builder" : "Enter cron manually"}
+          </button>
+
+          {manualMode && manualCron && (
+            <span
+              className={cn(
+                "text-xs font-medium",
+                manualValid ? "text-primary" : "text-destructive"
+              )}
+            >
+              {manualValid ? "Valid" : "Invalid"}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── Description with server timezone ── */}
       <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 border border-border/50 px-3.5 py-3">
@@ -1018,20 +1041,39 @@ export function CronScheduleBuilder({ value, onChange, serverTimezone }: CronSch
           )}
           {nextRuns.length > 0 && (
             <div className="mt-1.5 border-t border-border/40 pt-2 space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">
-                Upcoming runs <span className="font-normal opacity-70">(preview)</span>
-              </p>
-              <ul className="text-xs text-muted-foreground space-y-0.5">
-                {nextRuns.map((date) => (
-                  <li key={date.toISOString()} className="flex items-center gap-1.5">
-                    <span className="size-1 rounded-full bg-primary/50" />
-                    {format(date, "EEE, MMM d, yyyy 'at' h:mm a")}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-[11px] text-muted-foreground/60 italic">
-                Schedule continues indefinitely while enabled
-              </p>
+              {value.scheduleType === "once" ? (
+                <>
+                  <p className="text-xs font-medium text-muted-foreground">Scheduled run</p>
+                  <ul className="text-xs text-muted-foreground space-y-0.5">
+                    {nextRuns.map((date) => (
+                      <li key={date.toISOString()} className="flex items-center gap-1.5">
+                        <span className="size-1 rounded-full bg-primary/50" />
+                        {format(date, "EEE, MMM d, yyyy 'at' h:mm:ss a")}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground/60 italic">
+                    Message will be sent once and then auto-disabled
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Upcoming runs <span className="font-normal opacity-70">(preview)</span>
+                  </p>
+                  <ul className="text-xs text-muted-foreground space-y-0.5">
+                    {nextRuns.map((date) => (
+                      <li key={date.toISOString()} className="flex items-center gap-1.5">
+                        <span className="size-1 rounded-full bg-primary/50" />
+                        {format(date, "EEE, MMM d, yyyy 'at' h:mm:ss a")}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground/60 italic">
+                    Schedule continues indefinitely while enabled
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

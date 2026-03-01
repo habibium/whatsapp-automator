@@ -43,7 +43,9 @@ messagesRoutes.post("/", async (c) => {
     target?: string;
     isGroup?: boolean;
     message?: string;
+    scheduleType?: string;
     cronExpression?: string;
+    scheduledAt?: string;
     enabled?: boolean;
   };
 
@@ -55,13 +57,10 @@ messagesRoutes.post("/", async (c) => {
 
   const target = typeof body.target === "string" ? body.target.trim() : "";
   const message = typeof body.message === "string" ? body.message.trim() : "";
-  const cronExpression = typeof body.cronExpression === "string" ? body.cronExpression.trim() : "";
+  const scheduleType = body.scheduleType === "once" ? "once" : "recurring";
 
-  if (!target || !message || !cronExpression) {
-    return c.json(
-      { success: false, error: "target, message, and cronExpression are required" },
-      400
-    );
+  if (!target || !message) {
+    return c.json({ success: false, error: "target and message are required" }, 400);
   }
 
   if (target.length > 255) {
@@ -72,6 +71,45 @@ messagesRoutes.post("/", async (c) => {
     return c.json({ success: false, error: "message must be 10,000 characters or less" }, 400);
   }
 
+  // Validate based on schedule type
+  if (scheduleType === "once") {
+    if (!body.scheduledAt) {
+      return c.json(
+        { success: false, error: "scheduledAt is required for one-time schedules" },
+        400
+      );
+    }
+    const scheduledDate = new Date(body.scheduledAt);
+    if (Number.isNaN(scheduledDate.getTime())) {
+      return c.json({ success: false, error: "Invalid scheduledAt date" }, 400);
+    }
+    if (scheduledDate.getTime() <= Date.now()) {
+      return c.json({ success: false, error: "scheduledAt must be in the future" }, 400);
+    }
+
+    const message_ = await createScheduledMessage(user.id, {
+      target,
+      isGroup: body.isGroup === true,
+      message,
+      scheduleType: "once",
+      cronExpression: null,
+      scheduledAt: scheduledDate,
+      enabled: body.enabled !== false
+    });
+
+    schedulerService.updateSchedule(message_);
+    return c.json({ success: true, data: message_ }, 201);
+  }
+
+  // Recurring schedule
+  const cronExpression = typeof body.cronExpression === "string" ? body.cronExpression.trim() : "";
+  if (!cronExpression) {
+    return c.json(
+      { success: false, error: "cronExpression is required for recurring schedules" },
+      400
+    );
+  }
+
   if (!cron.validate(cronExpression)) {
     return c.json({ success: false, error: "Invalid cron expression" }, 400);
   }
@@ -80,13 +118,13 @@ messagesRoutes.post("/", async (c) => {
     target,
     isGroup: body.isGroup === true,
     message,
+    scheduleType: "recurring",
     cronExpression,
+    scheduledAt: null,
     enabled: body.enabled !== false
   });
 
-  // Update scheduler
   schedulerService.updateSchedule(message_);
-
   return c.json({ success: true, data: message_ }, 201);
 });
 
@@ -99,7 +137,9 @@ messagesRoutes.put("/:id", async (c) => {
     target?: string;
     isGroup?: boolean;
     message?: string;
+    scheduleType?: string;
     cronExpression?: string;
+    scheduledAt?: string | null;
     enabled?: boolean;
   };
 
@@ -121,24 +161,64 @@ messagesRoutes.put("/:id", async (c) => {
     return c.json({ success: false, error: "message must be 10,000 characters or less" }, 400);
   }
 
-  if (body.cronExpression && !cron.validate(body.cronExpression)) {
-    return c.json({ success: false, error: "Invalid cron expression" }, 400);
+  // Determine effective schedule type (use new value or keep existing)
+  const effectiveScheduleType =
+    body.scheduleType === "once" || body.scheduleType === "recurring"
+      ? body.scheduleType
+      : existing.scheduleType;
+
+  if (effectiveScheduleType === "once" && body.scheduledAt !== undefined) {
+    if (body.scheduledAt !== null) {
+      const scheduledDate = new Date(body.scheduledAt);
+      if (Number.isNaN(scheduledDate.getTime())) {
+        return c.json({ success: false, error: "Invalid scheduledAt date" }, 400);
+      }
+    }
   }
 
-  // Sanitize update payload — only allow known fields with correct types
+  if (effectiveScheduleType === "recurring" && body.cronExpression) {
+    if (!cron.validate(body.cronExpression)) {
+      return c.json({ success: false, error: "Invalid cron expression" }, 400);
+    }
+  }
+
+  // Sanitize update payload
   const updateData: Partial<{
     target: string;
     isGroup: boolean;
     message: string;
-    cronExpression: string;
+    scheduleType: string;
+    cronExpression: string | null;
+    scheduledAt: Date | null;
     enabled: boolean;
   }> = {};
+
   if (typeof body.target === "string") updateData.target = body.target.trim();
   if (typeof body.isGroup === "boolean") updateData.isGroup = body.isGroup;
   if (typeof body.message === "string") updateData.message = body.message.trim();
-  if (typeof body.cronExpression === "string")
-    updateData.cronExpression = body.cronExpression.trim();
   if (typeof body.enabled === "boolean") updateData.enabled = body.enabled;
+
+  if (body.scheduleType === "once" || body.scheduleType === "recurring") {
+    updateData.scheduleType = body.scheduleType;
+  }
+
+  if (effectiveScheduleType === "once") {
+    if (body.scheduledAt !== undefined) {
+      updateData.scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null;
+    }
+    // Clear cron when switching to once
+    if (body.scheduleType === "once") {
+      updateData.cronExpression = null;
+    }
+  } else {
+    if (typeof body.cronExpression === "string") {
+      updateData.cronExpression = body.cronExpression.trim();
+    }
+    // Clear scheduledAt when switching to recurring
+    if (body.scheduleType === "recurring") {
+      updateData.scheduledAt = null;
+    }
+  }
 
   const updated = await updateScheduledMessage(id, user.id, updateData);
 

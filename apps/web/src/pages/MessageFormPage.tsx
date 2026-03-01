@@ -42,11 +42,17 @@ import { useWhatsAppStore } from "../stores/whatsapp";
 
 // ── Zod Schema ─────────────────────────────────────────────────────
 
+const scheduleValueSchema = z.object({
+  scheduleType: z.enum(["once", "recurring"]),
+  cronExpression: z.string().nullable(),
+  scheduledAt: z.string().nullable()
+});
+
 const messageFormSchema = z.object({
   target: z.string().min(1, { error: "Recipient is required" }),
   isGroup: z.boolean(),
   message: z.string().min(1, { error: "Message content is required" }),
-  cronExpression: z.string().min(1, { error: "Schedule is required" }),
+  schedule: scheduleValueSchema,
   enabled: z.boolean()
 });
 
@@ -56,7 +62,11 @@ const defaultValues: MessageFormValues = {
   target: "",
   isGroup: false,
   message: "",
-  cronExpression: "0 9 * * *",
+  schedule: {
+    scheduleType: "recurring",
+    cronExpression: "0 9 * * *",
+    scheduledAt: null
+  },
   enabled: true
 };
 
@@ -130,7 +140,11 @@ export function MessageFormPage() {
         target: existingMessage.target,
         isGroup: existingMessage.isGroup,
         message: existingMessage.message,
-        cronExpression: existingMessage.cronExpression,
+        schedule: {
+          scheduleType: existingMessage.scheduleType,
+          cronExpression: existingMessage.cronExpression,
+          scheduledAt: existingMessage.scheduledAt
+        },
         enabled: existingMessage.enabled
       });
     }
@@ -166,10 +180,20 @@ export function MessageFormPage() {
   const onSubmit = (data: MessageFormValues) => {
     const onSuccess = () => navigate("/");
 
+    const payload = {
+      target: data.target,
+      isGroup: data.isGroup,
+      message: data.message,
+      scheduleType: data.schedule.scheduleType,
+      cronExpression: data.schedule.cronExpression,
+      scheduledAt: data.schedule.scheduledAt,
+      enabled: data.enabled
+    };
+
     if (isEditing && id) {
-      updateMutation.mutate({ id, data }, { onSuccess });
+      updateMutation.mutate({ id, data: payload }, { onSuccess });
     } else {
-      createMutation.mutate(data, { onSuccess });
+      createMutation.mutate(payload, { onSuccess });
     }
   };
 
@@ -412,7 +436,7 @@ export function MessageFormPage() {
           </CardHeader>
           <CardContent>
             <Controller
-              name="cronExpression"
+              name="schedule"
               control={form.control}
               render={({ field }) => (
                 <CronScheduleBuilder

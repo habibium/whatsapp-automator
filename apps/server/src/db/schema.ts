@@ -126,7 +126,9 @@ export const scheduledMessages = pgTable("scheduled_messages", {
   target: varchar("target", { length: 255 }).notNull(),
   isGroup: boolean("is_group").notNull().default(false),
   message: text("message").notNull(),
-  cronExpression: varchar("cron_expression", { length: 100 }).notNull(),
+  scheduleType: varchar("schedule_type", { length: 20 }).notNull().default("recurring"),
+  cronExpression: varchar("cron_expression", { length: 100 }),
+  scheduledAt: timestamp("scheduled_at"),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow()

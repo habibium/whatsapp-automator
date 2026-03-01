@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { describeCron } from "../components/CronScheduleBuilder";
+import { describeCron, describeSchedule } from "../components/CronScheduleBuilder";
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -165,18 +165,33 @@ export function MessagesPage() {
             <ArrowUpDown className="size-3.5" />
           </Button>
         ),
-        cell: ({ row }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="cursor-default text-sm text-foreground">
-                {describeCron(row.original.cronExpression)}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <code className="font-mono text-xs">{row.original.cronExpression}</code>
-            </TooltipContent>
-          </Tooltip>
-        )
+        cell: ({ row }) => {
+          const msg = row.original;
+          const scheduleDesc =
+            msg.scheduleType === "once"
+              ? describeSchedule({
+                  scheduleType: msg.scheduleType,
+                  cronExpression: msg.cronExpression,
+                  scheduledAt: msg.scheduledAt
+                })
+              : describeCron(msg.cronExpression ?? "");
+          const tooltipText =
+            msg.scheduleType === "once"
+              ? msg.scheduledAt
+                ? new Date(msg.scheduledAt).toLocaleString()
+                : "No date set"
+              : (msg.cronExpression ?? "");
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-default text-sm text-foreground">{scheduleDesc}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <code className="font-mono text-xs">{tooltipText}</code>
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
       },
       {
         accessorKey: "enabled",

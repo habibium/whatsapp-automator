@@ -11,7 +11,9 @@ export type ScheduledMessage = {
   target: string;
   isGroup: boolean;
   message: string;
-  cronExpression: string;
+  scheduleType: "once" | "recurring";
+  cronExpression: string | null;
+  scheduledAt: string | null;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
