@@ -1,6 +1,12 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
-  "globalDependencies": [".env", ".env.example", "tsconfig.base.json", "biome.json"],
+  "globalDependencies": [
+    ".env",
+    ".env.example",
+    "tsconfig.base.json",
+    ".oxlintrc.json",
+    ".oxfmtrc.json"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

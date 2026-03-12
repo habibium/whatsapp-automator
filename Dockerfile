@@ -2,7 +2,7 @@ FROM oven/bun:1.2.22 AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lock tsconfig.base.json tsconfig.json biome.json ./
+COPY package.json bun.lock tsconfig.base.json tsconfig.json .oxlintrc.json .oxfmtrc.json ./
 COPY apps ./apps
 COPY packages ./packages
 

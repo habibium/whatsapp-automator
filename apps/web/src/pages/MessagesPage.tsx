@@ -62,7 +62,7 @@ function TableSkeleton() {
         </TableHeader>
         <TableBody>
           {Array.from({ length: 5 }).map((_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows have no stable id
+            // oxlint-disable-next-line react/no-array-index-key
             <TableRow key={i}>
               <TableCell>
                 <div className="flex items-center gap-2">

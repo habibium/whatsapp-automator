@@ -83,7 +83,7 @@ function FormSkeleton() {
         </div>
       </div>
       {Array.from({ length: 3 }).map((_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards have no stable id
+        // oxlint-disable-next-line react/no-array-index-key
         <Card key={i}>
           <CardHeader className="pb-4">
             <Skeleton className="h-5 w-24" />

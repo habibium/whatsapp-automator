@@ -82,6 +82,7 @@ docker compose up --build
 ```
 
 This runs:
+
 - Postgres on `localhost:5432`
 - App on `http://localhost:3000`
 
@@ -104,7 +105,11 @@ docker run --rm -p 3000:3000 --env-file .env whatsapp-scheduler
 - `bun run db:generate` – Generate Drizzle migrations
 - `bun run db:migrate` – Run Drizzle migrations
 - `bun run clean` – Remove package build outputs and Turbo cache
-- `bun run biome` – Run Biome checks
+- `bun run lint` – Run Oxlint
+- `bun run lint:fix` – Apply safe Oxlint fixes
+- `bun run format` – Format files with Oxfmt
+- `bun run format:check` – Check Oxfmt formatting
+- `bun run check` – Run lint + format checks
 
 ## Hosting/deploy notes
 

@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["dist/**", ".turbo/**", "whatsapp-session/**"],
+  "plugins": ["oxc", "typescript", "unicorn", "react"],
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "rules": {
+    "no-console": "error",
+    "react/no-array-index-key": "error",
+    "typescript/no-non-null-assertion": "off"
+  }
+}

@@ -143,11 +143,12 @@ function CalendarDayButton({
   ...props
 }: React.ComponentProps<typeof DayButton>) {
   const defaultClassNames = getDefaultClassNames();
+  const isFocused = modifiers["focused"];
 
   const ref = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
-    if (modifiers["focused"]) ref.current?.focus();
-  }, [modifiers["focused"]]);
+    if (isFocused) ref.current?.focus();
+  }, [isFocused]);
 
   return (
     <Button

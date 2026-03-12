@@ -436,7 +436,7 @@ function HourSelect({ value, onChange }: { value: string; onChange: (v: string) 
           const period = i >= 12 ? "PM" : "AM";
           const h12 = i % 12 || 12;
           return (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static hour list
+            // oxlint-disable-next-line react/no-array-index-key
             <SelectItem key={i} value={String(i)}>
               {h12} {period}
             </SelectItem>
@@ -455,7 +455,7 @@ function MinuteSelect({ value, onChange }: { value: string; onChange: (v: string
       </SelectTrigger>
       <SelectContent>
         {Array.from({ length: 60 }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static minute list
+          // oxlint-disable-next-line react/no-array-index-key
           <SelectItem key={i} value={String(i)}>
             :{String(i).padStart(2, "0")}
           </SelectItem>
@@ -547,7 +547,7 @@ function DayOfMonthSelect({ value, onChange }: { value: string; onChange: (v: st
         </SelectTrigger>
         <SelectContent>
           {Array.from({ length: 31 }, (_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static day list
+            // oxlint-disable-next-line react/no-array-index-key
             <SelectItem key={i + 1} value={String(i + 1)}>
               {getOrdinal(i + 1)}
             </SelectItem>
