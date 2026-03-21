@@ -20,6 +20,8 @@
     "start:web": "turbo run start --filter=@app/web",
     "db:generate": "turbo run db:generate --filter=@app/server",
     "db:migrate": "turbo run db:migrate --filter=@app/server",
+    "db:push": "turbo run db:push --filter=@app/server",
+    "db:studio": "turbo run db:studio --filter=@app/server",
     "clean": "turbo run clean && rm -rf .turbo",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
