@@ -22,12 +22,15 @@ app.onError((err, c) => {
 
 import { isAllowedOrigin } from "./lib/origins.js";
 
+const defaultCorsOrigin =
+  process.env["APP_URL"] ?? process.env["BETTER_AUTH_URL"] ?? "http://localhost:3000";
+
 // CORS configuration
 app.use(
   "/api/*",
   cors({
     origin: (origin) => {
-      if (!origin) return "http://localhost:3000";
+      if (!origin) return defaultCorsOrigin;
       return isAllowedOrigin(origin) ? origin : null;
     },
     credentials: true

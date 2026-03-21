@@ -13,6 +13,7 @@ import { Footer } from "../components/Footer";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { authClient } from "../lib/auth-client";
+import { getApiOrigin } from "../lib/public-url";
 import { useAuthStore } from "../stores/auth";
 
 type VerifyStatus = "verifying" | "success" | "expired" | "error";
@@ -41,9 +42,7 @@ export function VerifyEmailPage() {
 
     const verify = async () => {
       try {
-        const apiBase = import.meta.env["VITE_API_URL"]
-          ? new URL(import.meta.env["VITE_API_URL"]).origin
-          : "";
+        const apiBase = getApiOrigin();
 
         // Use redirect: "manual" so we can distinguish success (302 redirect)
         // from failure (4xx JSON response). The browser still processes
