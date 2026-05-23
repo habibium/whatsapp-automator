@@ -1,0 +1,26 @@
+{
+  "name": "whatsapp-message-scheduler",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "oxfmt": "^0.51.0",
+    "oxlint": "^1.66.0",
+    "turbo": "^2.9.14",
+    "typescript": "^6.0.3"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.2.2",
+      "onFail": "download"
+    }
+  }
+}
