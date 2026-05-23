@@ -1,44 +1,32 @@
 {
-  "$schema": "https://turborepo.dev/schema.json",
-  "globalDependencies": [
-    ".env",
-    ".env.example",
-    "tsconfig.base.json",
-    ".oxlintrc.json",
-    ".oxfmtrc.json"
-  ],
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "globalDependencies": ["tsconfig.base.json", ".env"],
+  "globalEnv": ["NODE_ENV", "CI"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "@app/server#dev": {
-      "with": ["@pkg/shared#dev"]
     },
     "start": {
       "dependsOn": ["build"],
       "cache": false,
       "persistent": true
     },
-    "db:generate": {
-      "cache": false
-    },
-    "db:migrate": {
-      "cache": false
-    },
-    "db:push": {
-      "cache": false
-    },
-    "db:studio": {
-      "cache": false,
-      "persistent": true
-    },
-    "clean": {
-      "cache": false
-    }
+    "db:generate": { "cache": false },
+    "db:migrate": { "cache": false },
+    "db:studio": { "cache": false, "persistent": true },
+    "clean": { "cache": false }
   }
 }

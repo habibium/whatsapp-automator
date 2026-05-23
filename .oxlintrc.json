@@ -1,14 +1,29 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["dist/**", ".turbo/**", "whatsapp-session/**"],
-  "plugins": ["oxc", "typescript", "unicorn", "react"],
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
   "env": {
     "browser": true,
-    "node": true
+    "node": true,
+    "es2024": true
   },
+  "ignorePatterns": ["**/dist/**", "**/coverage/**", "**/drizzle/**", "**/node_modules/**"],
   "rules": {
-    "no-console": "error",
-    "react/no-array-index-key": "error",
-    "typescript/no-non-null-assertion": "off"
-  }
+    "import/no-cycle": "error",
+    "import/no-unassigned-import": "off",
+    "no-console": "off",
+    "react/react-in-jsx-scope": "off",
+    "unicorn/no-array-sort": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "**/tests/**"],
+      "rules": {
+        "no-await-in-loop": "off"
+      }
+    }
+  ]
 }

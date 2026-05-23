@@ -1,47 +1,49 @@
-import { relations } from "drizzle-orm";
+import type { ConnectionStatus, DeliveryStatus, RecipientType, ScheduleKind } from "@pkg/shared";
 import {
   boolean,
   index,
-  jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
   varchar
 } from "drizzle-orm/pg-core";
 
-// ── Better Auth Tables ─────────────────────────────────────────────
+// ── Better Auth tables ───────────────────────────────────────────────
+// Shape mandated by Better Auth's Drizzle adapter (user/session/account/verification).
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").default(false).notNull(),
+  emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
     .defaultNow()
     .$onUpdate(() => new Date())
-    .notNull()
 });
 
 export const session = pgTable(
   "session",
   {
     id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at").notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => new Date())
-      .notNull(),
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" })
+      .references(() => user.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
-  (table) => [index("session_userId_idx").on(table.userId)]
+  (t) => [index("session_user_id_idx").on(t.userId)]
 );
 
 export const account = pgTable(
@@ -56,16 +58,17 @@ export const account = pgTable(
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at"),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => new Date())
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
-  (table) => [index("account_userId_idx").on(table.userId)]
+  (t) => [index("account_user_id_idx").on(t.userId)]
 );
 
 export const verification = pgTable(
@@ -74,66 +77,148 @@ export const verification = pgTable(
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
       .defaultNow()
       .$onUpdate(() => new Date())
-      .notNull()
   },
-  (table) => [index("verification_identifier_idx").on(table.identifier)]
+  (t) => [index("verification_identifier_idx").on(t.identifier)]
 );
 
-// ── Better Auth Relations ──────────────────────────────────────────
+// ── WhatsApp connection ──────────────────────────────────────────────
 
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account)
-}));
-
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, {
-    fields: [session.userId],
-    references: [user.id]
-  })
-}));
-
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, {
-    fields: [account.userId],
-    references: [user.id]
-  })
-}));
-
-// ── Application Tables ────────────────────────────────────────────
-
-export const whatsappConnections = pgTable("whatsapp_connections", {
-  id: uuid("id").primaryKey().defaultRandom(),
+/** One row per user — the Baileys credential blob, encrypted at rest. */
+export const whatsappSession = pgTable("whatsapp_session", {
   userId: text("user_id")
-    .notNull()
-    .unique()
+    .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
-  authState: jsonb("auth_state"),
-  status: varchar("status", { length: 50 }).notNull().default("disconnected"),
-  updatedAt: timestamp("updated_at").notNull().defaultNow()
+  /** Encrypted Baileys `AuthenticationCreds` JSON. */
+  creds: text("creds"),
+  /** Connected phone number, once paired. */
+  phoneNumber: varchar("phone_number", { length: 32 }),
+  status: varchar("status", { length: 16 })
+    .notNull()
+    .default("disconnected")
+    .$type<ConnectionStatus>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date())
 });
 
-export const scheduledMessages = pgTable("scheduled_messages", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  target: varchar("target", { length: 255 }).notNull(),
-  isGroup: boolean("is_group").notNull().default(false),
-  message: text("message").notNull(),
-  scheduleType: varchar("schedule_type", { length: 20 }).notNull().default("recurring"),
-  cronExpression: varchar("cron_expression", { length: 100 }),
-  scheduledAt: timestamp("scheduled_at"),
-  enabled: boolean("enabled").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow()
-});
+/** Baileys Signal protocol keys — one row per key, encrypted at rest. */
+export const whatsappSignalKey = pgTable(
+  "whatsapp_signal_key",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    category: varchar("category", { length: 64 }).notNull(),
+    keyId: varchar("key_id", { length: 255 }).notNull(),
+    /** Encrypted JSON value. */
+    data: text("data").notNull()
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.category, t.keyId] })]
+);
 
-export type WhatsAppConnection = typeof whatsappConnections.$inferSelect;
-export type ScheduledMessageRow = typeof scheduledMessages.$inferSelect;
-export type NewScheduledMessage = typeof scheduledMessages.$inferInsert;
+// ── Message templates ────────────────────────────────────────────────
+
+export const messageTemplate = pgTable(
+  "message_template",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
+  },
+  (t) => [index("message_template_user_id_idx").on(t.userId)]
+);
+
+// ── Scheduled messages ───────────────────────────────────────────────
+
+export const scheduledMessage = pgTable(
+  "scheduled_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    recipientType: varchar("recipient_type", { length: 16 }).notNull().$type<RecipientType>(),
+    recipient: varchar("recipient", { length: 255 }).notNull(),
+    recipientName: varchar("recipient_name", { length: 255 }),
+    body: text("body").notNull(),
+    scheduleKind: varchar("schedule_kind", { length: 16 }).notNull().$type<ScheduleKind>(),
+    /** Set for one-time schedules. */
+    runAt: timestamp("run_at", { withTimezone: true }),
+    /** Set for recurring schedules. */
+    cron: varchar("cron", { length: 100 }),
+    timezone: varchar("timezone", { length: 64 }).notNull().default("UTC"),
+    templateId: uuid("template_id").references(() => messageTemplate.id, {
+      onDelete: "set null"
+    }),
+    enabled: boolean("enabled").notNull().default(true),
+    /** When the scheduler should next fire this message. NULL once exhausted. */
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
+  },
+  (t) => [
+    index("scheduled_message_user_id_idx").on(t.userId),
+    // Serves the scheduler tick's "due messages" query.
+    index("scheduled_message_due_idx").on(t.enabled, t.nextRunAt)
+  ]
+);
+
+// ── Deliveries ───────────────────────────────────────────────────────
+
+/** A record of every send attempt — scheduled or ad-hoc. */
+export const delivery = pgTable(
+  "delivery",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** NULL for ad-hoc sends, or if the source schedule was later deleted. */
+    scheduledMessageId: uuid("scheduled_message_id").references(() => scheduledMessage.id, {
+      onDelete: "set null"
+    }),
+    recipientType: varchar("recipient_type", { length: 16 }).notNull().$type<RecipientType>(),
+    recipient: varchar("recipient", { length: 255 }).notNull(),
+    recipientName: varchar("recipient_name", { length: 255 }),
+    body: text("body").notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("pending").$type<DeliveryStatus>(),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true })
+  },
+  (t) => [
+    index("delivery_user_created_idx").on(t.userId, t.createdAt),
+    index("delivery_scheduled_message_idx").on(t.scheduledMessageId)
+  ]
+);
+
+// ── Inferred row types ───────────────────────────────────────────────
+
+export type User = typeof user.$inferSelect;
+export type WhatsappSession = typeof whatsappSession.$inferSelect;
+export type WhatsappSignalKey = typeof whatsappSignalKey.$inferSelect;
+export type MessageTemplate = typeof messageTemplate.$inferSelect;
+export type NewMessageTemplate = typeof messageTemplate.$inferInsert;
+export type ScheduledMessage = typeof scheduledMessage.$inferSelect;
+export type NewScheduledMessage = typeof scheduledMessage.$inferInsert;
+export type Delivery = typeof delivery.$inferSelect;
+export type NewDelivery = typeof delivery.$inferInsert;

@@ -1,31 +1,24 @@
+# Development companion: just the Postgres database.
+# The server and web run locally via `pnpm run dev` for hot reload.
+# Host port 5433 is used to avoid clashing with a system Postgres on 5432.
+
 services:
   db:
-    image: postgres:18
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: whatsapp_scheduler
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      PORT: 3000
-      WEB_DIST_DIR: /app/apps/web/dist
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/whatsapp_scheduler
-    ports:
-      - "3000:3000"
-    depends_on:
-      - db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d whatsapp_scheduler"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:

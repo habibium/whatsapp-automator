@@ -1,10 +1,18 @@
-node_modules
+node_modules/
 dist/
+coverage/
 .turbo/
+*.tsbuildinfo
 
+# Environment
 .env
-tsconfig.tsbuildinfo
+.env.*
+!.env.example
 
-# WhatsApp session data
-whatsapp-session/
-auth_info*
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+*.local
