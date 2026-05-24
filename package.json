@@ -5,7 +5,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
     "lint": "oxlint",
     "format": "oxfmt && oxlint --fix",
     "check": "oxfmt --check"
@@ -19,10 +21,11 @@
     "turbo": "^2.9.14",
     "typescript": "^6.0.3"
   },
+  "packageManager": "pnpm@11.2.2",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "^11.2.2",
+      "version": "11.2.2",
       "onFail": "download"
     }
   }
