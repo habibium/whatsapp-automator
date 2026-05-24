@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["import", "typescript"],
+  "plugins": ["import", "typescript", "react"],
   "categories": {
     "correctness": "off"
   },
@@ -63,7 +63,6 @@
     "require-yield": "error",
     "use-isnan": "error",
     "valid-typeof": "error",
-    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
     "import/first": "error",
     "import/newline-after-import": "error",
     "import/no-commonjs": "error",
@@ -96,6 +95,10 @@
     "typescript/no-wrapper-object-types": "error",
     "typescript/prefer-as-const": "error",
     "typescript/prefer-for-of": "warn",
-    "typescript/triple-slash-reference": "error"
+    "typescript/triple-slash-reference": "error",
+    "react/jsx-curly-brace-presence": [
+      "error",
+      { "props": "never", "children": "never" }
+    ]
   }
 }
