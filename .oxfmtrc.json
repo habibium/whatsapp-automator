@@ -5,6 +5,9 @@
   "trailingComma": "all",
   "printWidth": 80,
   "sortPackageJson": false,
+  "sortTailwindcss": {
+    "functions": ["clsx", "cn", "cva", "tw"]
+  },
   "ignorePatterns": [
     "pnpm-lock.yaml",
     "**/dist/**",
