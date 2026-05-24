@@ -1,6 +1,7 @@
 packages:
   - 'apps/*'
 allowBuilds:
+  '@swc/core': true
   esbuild: true
   sharp: true
   workerd: true
