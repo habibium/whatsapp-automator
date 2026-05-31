@@ -3,5 +3,6 @@ packages:
 allowBuilds:
   '@swc/core': true
   esbuild: true
+  msw: true
   sharp: true
   workerd: true
