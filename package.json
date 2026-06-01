@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "start": "turbo run start",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint",
     "format": "oxfmt && oxlint --fix",
