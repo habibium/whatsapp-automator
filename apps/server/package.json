@@ -2,12 +2,13 @@
   "name": "server",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/index.ts --env-file=.env",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node --env-file=.env dist/index.js"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.14",
+    "better-auth": "^1.6.13",
     "hono": "^4.12.23"
   },
   "devDependencies": {
