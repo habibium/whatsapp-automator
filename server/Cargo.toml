@@ -6,11 +6,14 @@ edition = "2024"
 [dependencies]
 axum = { version = "0.8", features = ["macros", "tracing"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.151"
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.7", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-utoipa = "5"
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-axum = "0.2.0"
+utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 
 [lints]
 workspace = true
