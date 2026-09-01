@@ -12,7 +12,7 @@ tower-http = { version = "0.7", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa = { version = "5", features = ["axum_extras"] }
-utoipa-axum = "0.2.0"
+utoipa-axum = "0.2"
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 
 [lints]
