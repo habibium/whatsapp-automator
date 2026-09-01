@@ -2,8 +2,16 @@
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.codeActionsOnSave": {
-    "source.fixAll.oxc": "always",
-    "source.organizeImports": "always",
+    "source.fixAll.oxc": "always"
   },
-  "typescript.tsdk": "node_modules/typescript/lib",
+  "files.watcherExclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "search.exclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "files.readonlyInclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "js/ts.tsdk.path": "./web/node_modules/typescript/lib"
 }
