@@ -7,6 +7,12 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 const config = defineConfig({
+  server: {
+    allowedHosts: ['ezown-dev.naxata.com'],
+    proxy: {
+      '/api': 'http://localhost:8000/',
+    },
+  },
   resolve: { tsconfigPaths: true },
   plugins: [
     devtools(),

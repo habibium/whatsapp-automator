@@ -2,14 +2,11 @@
   "name": "web",
   "private": true,
   "type": "module",
-  "imports": {
-    "#/*": "./src/*"
-  },
   "scripts": {
     "dev": "vite dev --host --port 3000",
     "generate-routes": "tsr generate",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host --port 3000",
     "lint": "oxlint",
     "format": "oxfmt && oxlint --fix",
     "check": "oxfmt --check"
