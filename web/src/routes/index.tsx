@@ -1,19 +1,17 @@
+import { $api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
 
 export const Route = createFileRoute('/')({ component: Home })
 
 function Home() {
-  const [message, setMessage] = useState('')
+  const { data: message } = $api.useQuery('get', '/api/hello', {
+    parseAs: 'text',
+  })
 
-  useEffect(() => {
-    fetch('/api/hello')
-      .then((res) => res.text())
-      .then((data) => {
-        setMessage(data)
-      })
-  }, [])
+  const { data: json } = $api.useQuery('get', '/api/pets/{id}', {
+    params: { path: { id: 1 } },
+  })
 
   return (
     <div className="p-8">
@@ -23,6 +21,7 @@ function Home() {
       </p>
       <Button>Click me</Button>
       <p className="mt-4 text-lg text-red-500">{message}</p>
+      <pre>{JSON.stringify(json, null, 2)}</pre>
     </div>
   )
 }
