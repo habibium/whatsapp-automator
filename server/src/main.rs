@@ -10,7 +10,7 @@ use utoipa_scalar::{Scalar, Servable as ScalarServable};
 const PORT: u16 = 8000;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             EnvFilter::try_from_default_env()
@@ -33,7 +33,9 @@ async fn main() {
         std::process::exit(1);
     };
 
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app).await?;
+
+    Ok(())
 }
 
 #[derive(OpenApi)]
