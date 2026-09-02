@@ -63,7 +63,7 @@
     "require-yield": "error",
     "use-isnan": "error",
     "valid-typeof": "error",
-    "import/consistent-type-specifier-style": ["error", "prefer-inline"],
+    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
     "import/first": "error",
     "import/newline-after-import": "error",
     "import/no-commonjs": "error",
@@ -97,6 +97,7 @@
     "typescript/no-wrapper-object-types": "error",
     "typescript/prefer-as-const": "error",
     "typescript/prefer-for-of": "warn",
-    "typescript/triple-slash-reference": "error"
+    "typescript/triple-slash-reference": "error",
+    "typescript/no-import-type-side-effects": "error"
   }
 }
