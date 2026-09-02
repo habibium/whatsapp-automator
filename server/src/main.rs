@@ -1,4 +1,4 @@
-use axum::{Json, Router, extract::Path, routing::get};
+use axum::{Json, extract::Path};
 use serde::Serialize;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
