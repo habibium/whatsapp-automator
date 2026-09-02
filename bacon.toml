@@ -7,10 +7,7 @@ env.CARGO_TERM_COLOR = "always"
 command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
 
 [jobs.run]
-command = [
-  "cargo",
-  "run",
-]
+command = ["sh", "-c", "cargo run --bin openapi && exec cargo run --bin server"]
 need_stdout = true
 background = false
 on_change_strategy = "kill_then_restart"
