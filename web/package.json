@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --host --port 3000",
+    "dev": "vite dev --host",
     "generate-routes": "tsr generate",
     "build": "vite build",
-    "preview": "vite preview --host --port 3000",
+    "preview": "vite preview --host",
     "lint": "oxlint",
     "format": "oxfmt && oxlint --fix",
     "check": "oxfmt --check"
