@@ -10,7 +10,7 @@
     "lint": "oxlint",
     "format": "oxfmt && oxlint --fix",
     "check": "oxfmt --check",
-    "gen:api": "node scripts/gen-api.ts"
+    "gen:api": "node scripts/gen-api-types.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
