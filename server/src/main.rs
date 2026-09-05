@@ -9,7 +9,6 @@ const PORT: u16 = 8000;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("whatsapp-rust installed successfully!");
     tracing_subscriber::registry()
         .with(
             EnvFilter::try_from_default_env()

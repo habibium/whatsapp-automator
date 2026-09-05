@@ -1,0 +1,6 @@
+procs:
+  server:
+    shell: bacon
+  web:
+    shell: pnpm dev
+    cwd: web
