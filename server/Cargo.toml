@@ -10,7 +10,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sqlx = { version = "0.9", features = ["chrono", "postgres", "tls-rustls", "uuid"] }
+sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.7", features = ["trace"] }
 tracing = "0.1"

@@ -1,13 +1,19 @@
 use axum::{Json, Router, extract::Path};
 use serde::Serialize;
+use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
+
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: PgPool,
+}
 
 #[derive(OpenApi)]
 #[openapi(info(title = "whatsapp-automator"))]
 struct ApiDoc;
 
-pub fn router() -> (Router, utoipa::openapi::OpenApi) {
+pub fn router() -> (Router<AppState>, utoipa::openapi::OpenApi) {
     OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(hello))
         .routes(routes!(get_pet_by_id))
