@@ -1,10 +1,10 @@
 use axum::{Json, extract::State};
-use validator::Validate;
 
 use super::dto::{SignupRequest, SignupResponse};
 use crate::{
     AppState,
     error::{AppError, ErrorBody},
+    extract::ValidatedJson,
 };
 
 /// Sign up
@@ -16,10 +16,8 @@ use crate::{
 ))]
 pub async fn signup(
     State(state): State<AppState>,
-    Json(payload): Json<SignupRequest>,
+    ValidatedJson(payload): ValidatedJson<SignupRequest>,
 ) -> Result<Json<SignupResponse>, AppError> {
-    payload.validate()?;
-
     Ok(Json(SignupResponse {
         id: uuid::Uuid::new_v4(),
         email: payload.email,

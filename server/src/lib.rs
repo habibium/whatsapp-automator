@@ -1,4 +1,5 @@
 mod error;
+mod extract;
 mod routes;
 
 use axum::Router;

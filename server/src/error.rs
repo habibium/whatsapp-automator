@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use axum::{
     Json,
+    extract::rejection::JsonRejection,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -16,6 +17,8 @@ pub enum AppError {
     NotFound,
     #[error("Validation Failed")]
     Validation(#[from] validator::ValidationErrors),
+    #[error("{}", .0.body_text())]
+    Json(#[from] JsonRejection),
     #[error(transparent)]
     Db(#[from] sqlx::Error),
 }
@@ -59,6 +62,7 @@ impl IntoResponse for AppError {
                     None,
                 )
             }
+            Self::Json(_) => (StatusCode::BAD_REQUEST, self.to_string(), None),
         };
 
         (

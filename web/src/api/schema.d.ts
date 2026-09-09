@@ -35,10 +35,6 @@ export interface components {
             error: string;
         };
         SignupRequest: {
-            /**
-             * Format: email
-             * @example user@example.com
-             */
             email: string;
             password: string;
         };
