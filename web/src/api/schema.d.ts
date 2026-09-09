@@ -28,6 +28,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ErrorBody: {
+            details?: {
+                [key: string]: string[];
+            } | null;
+            error: string;
+        };
         SignupRequest: {
             /**
              * Format: email
@@ -75,6 +81,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SignupResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
         };

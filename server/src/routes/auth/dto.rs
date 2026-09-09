@@ -5,13 +5,17 @@ use uuid::Uuid;
 use validator::Validate;
 
 #[derive(Deserialize, Validate, ToSchema)]
-pub struct SignupRequest {
-    #[validate(email)]
+pub(super) struct SignupRequest {
+    #[validate(email(message = "must be a valid email address"))]
     #[schema(format = "email", example = "user@example.com")]
-    email: String,
-    #[validate(length(min = 8, max = 128))]
+    pub(super) email: String,
+    #[validate(length(
+        min = 8,
+        max = 128,
+        message = "password must be between 8 and 128 characters"
+    ))]
     #[schema(min_length = 8, max_length = 128)]
-    password: String,
+    pub(super) password: String,
 }
 
 #[derive(Serialize, ToSchema)]

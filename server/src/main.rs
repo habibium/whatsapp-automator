@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = router
         .with_state(AppState { pool })
-        .merge(Scalar::with_url("/docs", api))
+        .merge(Scalar::with_url("/api/docs", api))
         .layer(TraceLayer::new_for_http());
 
     let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, PORT)).await?;
