@@ -28,11 +28,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AuthRequest: {
+        Credentials: {
             email: string;
             password: string;
         };
-        AuthResponse: {
+        ErrorBody: {
+            details?: {
+                [key: string]: string[];
+            } | null;
+            error: string;
+        };
+        UserResponse: {
             /** Format: date-time */
             created_at: string;
             email: string;
@@ -42,12 +48,6 @@ export interface components {
             updated_at: string;
             /** Format: date-time */
             verified_at?: string | null;
-        };
-        ErrorBody: {
-            details?: {
-                [key: string]: string[];
-            } | null;
-            error: string;
         };
     };
     responses: never;
@@ -67,7 +67,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AuthRequest"];
+                "application/json": components["schemas"]["Credentials"];
             };
         };
         responses: {
@@ -76,7 +76,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthResponse"];
+                    "application/json": components["schemas"]["UserResponse"];
                 };
             };
             400: {

@@ -18,7 +18,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AuthRequest"
+                "$ref": "#/components/schemas/Credentials"
               }
             }
           },
@@ -30,7 +30,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthResponse"
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             }
@@ -71,7 +71,7 @@
   },
   "components": {
     "schemas": {
-      "AuthRequest": {
+      "Credentials": {
         "type": "object",
         "required": [
           "email",
@@ -86,7 +86,33 @@
           }
         }
       },
-      "AuthResponse": {
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "details": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "UserResponse": {
         "type": "object",
         "required": [
           "id",
@@ -116,32 +142,6 @@
               "null"
             ],
             "format": "date-time"
-          }
-        }
-      },
-      "ErrorBody": {
-        "type": "object",
-        "required": [
-          "error"
-        ],
-        "properties": {
-          "details": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "propertyNames": {
-              "type": "string"
-            }
-          },
-          "error": {
-            "type": "string"
           }
         }
       }
