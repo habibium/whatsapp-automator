@@ -18,7 +18,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SignupRequest"
+                "$ref": "#/components/schemas/AuthRequest"
               }
             }
           },
@@ -30,12 +30,32 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SignupResponse"
+                  "$ref": "#/components/schemas/AuthResponse"
                 }
               }
             }
           },
           "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
             "description": "",
             "content": {
               "application/json": {
@@ -51,33 +71,7 @@
   },
   "components": {
     "schemas": {
-      "ErrorBody": {
-        "type": "object",
-        "required": [
-          "error"
-        ],
-        "properties": {
-          "details": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "propertyNames": {
-              "type": "string"
-            }
-          },
-          "error": {
-            "type": "string"
-          }
-        }
-      },
-      "SignupRequest": {
+      "AuthRequest": {
         "type": "object",
         "required": [
           "email",
@@ -92,7 +86,7 @@
           }
         }
       },
-      "SignupResponse": {
+      "AuthResponse": {
         "type": "object",
         "required": [
           "id",
@@ -122,6 +116,32 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "details": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string"
           }
         }
       }

@@ -1,16 +1,14 @@
+mod db;
 mod error;
 mod extract;
 mod routes;
+pub mod state;
 
 use axum::Router;
-use sqlx::PgPool;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 
-#[derive(Clone)]
-pub struct AppState {
-    pub pool: PgPool,
-}
+use crate::state::AppState;
 
 #[derive(OpenApi)]
 #[openapi(info(title = "whatsapp-automator"))]

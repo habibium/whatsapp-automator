@@ -28,17 +28,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        ErrorBody: {
-            details?: {
-                [key: string]: string[];
-            } | null;
-            error: string;
-        };
-        SignupRequest: {
+        AuthRequest: {
             email: string;
             password: string;
         };
-        SignupResponse: {
+        AuthResponse: {
             /** Format: date-time */
             created_at: string;
             email: string;
@@ -48,6 +42,12 @@ export interface components {
             updated_at: string;
             /** Format: date-time */
             verified_at?: string | null;
+        };
+        ErrorBody: {
+            details?: {
+                [key: string]: string[];
+            } | null;
+            error: string;
         };
     };
     responses: never;
@@ -67,7 +67,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SignupRequest"];
+                "application/json": components["schemas"]["AuthRequest"];
             };
         };
         responses: {
@@ -76,10 +76,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SignupResponse"];
+                    "application/json": components["schemas"]["AuthResponse"];
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
