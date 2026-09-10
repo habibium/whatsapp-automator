@@ -1,7 +1,7 @@
 use axum::{Json, extract::State};
 
 use super::{
-    dto::{AuthRequest, AuthResponse},
+    dto::{Credentials, UserResponse},
     password,
 };
 use crate::{
@@ -13,30 +13,26 @@ use crate::{
 /// Sign up
 ///
 /// Sign up a user with email & password
-#[utoipa::path(post, path = "/signup", request_body = AuthRequest, responses(
-    (status = OK, body = AuthResponse),
+#[utoipa::path(post, path = "/signup", request_body = Credentials, responses(
+    (status = OK, body = UserResponse),
     (status = BAD_REQUEST, body = ErrorBody),
     (status = CONFLICT, body = ErrorBody),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn signup(
     State(state): State<AppState>,
-    ValidatedJson(payload): ValidatedJson<AuthRequest>,
-) -> Result<Json<AuthResponse>, AppError> {
+    ValidatedJson(payload): ValidatedJson<Credentials>,
+) -> Result<Json<UserResponse>, AppError> {
     let password_hash = password::hash(payload.password).await?;
 
-    let user = db::users::insert(
-        &state.pool,
-        payload.email.trim().to_lowercase(),
-        password_hash,
-    )
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::Database(db_err) if db_err.is_unique_violation() => {
-            AppError::Conflict("Email already registered")
-        }
-        e => e.into(),
-    })?;
+    let user = db::users::insert(&state.pool, payload.email.to_lowercase(), password_hash)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::Database(db_err) if db_err.is_unique_violation() => {
+                AppError::Conflict("Email already registered")
+            }
+            e => e.into(),
+        })?;
 
     Ok(Json(user.into()))
 }

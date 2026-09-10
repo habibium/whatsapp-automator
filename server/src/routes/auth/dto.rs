@@ -7,7 +7,7 @@ use validator::Validate;
 use crate::db;
 
 #[derive(Deserialize, Validate, ToSchema)]
-pub(super) struct AuthRequest {
+pub(super) struct Credentials {
     #[validate(email(message = "must be a valid email address"))]
     pub email: String,
     #[validate(length(min = 8, max = 128, message = "must be between 8 and 128 characters"))]
@@ -15,7 +15,7 @@ pub(super) struct AuthRequest {
 }
 
 #[derive(Serialize, ToSchema)]
-pub(super) struct AuthResponse {
+pub(super) struct UserResponse {
     pub id: Uuid,
     pub email: String,
     pub verified_at: Option<DateTime<Utc>>,
@@ -23,7 +23,7 @@ pub(super) struct AuthResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<db::users::User> for AuthResponse {
+impl From<db::users::User> for UserResponse {
     fn from(value: db::users::User) -> Self {
         Self {
             id: value.id,
