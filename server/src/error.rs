@@ -13,14 +13,21 @@ use utoipa::ToSchema;
 pub enum AppError {
     #[error("Unauthorized")]
     Unauthorized,
+
     #[error("Not Found")]
     NotFound,
+
     #[error("Validation Failed")]
     Validation(#[from] validator::ValidationErrors),
+
     #[error("{}", .0.body_text())]
     Json(#[from] JsonRejection),
+
     #[error(transparent)]
     Db(#[from] sqlx::Error),
+
+    #[error(transparent)]
+    Internal(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -34,7 +41,9 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message, details) = match self {
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string(), None),
+
             Self::NotFound => (StatusCode::NOT_FOUND, self.to_string(), None),
+
             Self::Validation(e) => {
                 let details = e
                     .field_errors()
@@ -54,6 +63,9 @@ impl IntoResponse for AppError {
                     Some(details),
                 )
             }
+
+            Self::Json(_) => (StatusCode::BAD_REQUEST, self.to_string(), None),
+
             Self::Db(e) => {
                 tracing::error!(error = ?e, "database error");
                 (
@@ -62,7 +74,15 @@ impl IntoResponse for AppError {
                     None,
                 )
             }
-            Self::Json(_) => (StatusCode::BAD_REQUEST, self.to_string(), None),
+
+            Self::Internal(e) => {
+                tracing::error!(error = ?e, "internal server error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".into(),
+                    None,
+                )
+            }
         };
 
         (
