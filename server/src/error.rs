@@ -20,6 +20,9 @@ pub enum AppError {
     #[error("Validation Failed")]
     Validation(#[from] validator::ValidationErrors),
 
+    #[error("{0}")]
+    Conflict(&'static str),
+
     #[error("{}", .0.body_text())]
     Json(#[from] JsonRejection),
 
@@ -63,6 +66,8 @@ impl IntoResponse for AppError {
                     Some(details),
                 )
             }
+
+            Self::Conflict(_) => (StatusCode::CONFLICT, self.to_string(), None),
 
             Self::Json(_) => (StatusCode::BAD_REQUEST, self.to_string(), None),
 
