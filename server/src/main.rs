@@ -1,7 +1,6 @@
-use std::{net::Ipv4Addr, path::Path};
+use std::net::Ipv4Addr;
 
-use anyhow::Context;
-use server::state::AppState;
+use server::{config::Config, state::AppState};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_http::{
@@ -10,9 +9,6 @@ use tower_http::{
 };
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
-
-const PORT: u16 = 8000;
-const WEB_PATH: &str = "web/dist";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,14 +21,16 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // setup db pool
-    dotenvy::dotenv().with_context(|| "Error failed to load .env")?;
-    let database_url = dotenvy::var("DATABASE_URL")?;
-    let pool = PgPoolOptions::new().connect(&database_url).await?;
+    // .env is a dev convenience; production supplies real environment variables
+    dotenvy::dotenv().ok();
+    let config = Config::from_env()?;
+
+    let pool = PgPoolOptions::new().connect(&config.database_url).await?;
+    sqlx::migrate!().run(&pool).await?;
 
     let (router, api) = server::router();
-    let web_path = Path::new(WEB_PATH);
-    let web = ServeDir::new(web_path).fallback(ServeFile::new(web_path.join("index.html")));
+    let web =
+        ServeDir::new(&config.web_dir).fallback(ServeFile::new(config.web_dir.join("index.html")));
 
     let app = router
         .fallback_service(web)
@@ -40,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(Scalar::with_url("/api/docs", api))
         .layer(TraceLayer::new_for_http());
 
-    let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, PORT)).await?;
+    let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, config.port)).await?;
     tracing::info!("server running on http://{}", listener.local_addr()?);
 
     axum::serve(listener, app).await?;

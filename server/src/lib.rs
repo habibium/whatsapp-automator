@@ -1,3 +1,4 @@
+pub mod config;
 mod db;
 mod error;
 mod extract;
@@ -18,7 +19,9 @@ pub fn router() -> (Router<AppState>, utoipa::openapi::OpenApi) {
     OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest(
             "/api",
-            OpenApiRouter::new().nest("/auth", routes::auth::router()),
+            OpenApiRouter::new()
+                .merge(routes::health::router())
+                .nest("/auth", routes::auth::router()),
         )
         .split_for_parts()
 }
