@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING *",
+  "query": "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email, verified_at, created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -27,17 +27,6 @@
       },
       {
         "ordinal": 2,
-        "name": "password",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "users",
-            "name": "password"
-          }
-        }
-      },
-      {
-        "ordinal": 3,
         "name": "verified_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -48,7 +37,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -59,7 +48,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -79,11 +68,10 @@
     "nullable": [
       false,
       false,
-      false,
       true,
       false,
       false
     ]
   },
-  "hash": "3e320f021f38b70d25f6787678a69cab5446ae92e65af1e7f75bec6c8de39955"
+  "hash": "696c665e34ac465f05178424d05f1c025e2c5b4a3c89c4cdbd3919369098173a"
 }
