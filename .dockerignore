@@ -1,0 +1,12 @@
+target
+web/node_modules
+web/dist
+.git
+.github
+.vscode
+.claude
+.env
+.env.*
+!.env.example
+Dockerfile
+*.md
