@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [rewrite, main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
+
+jobs:
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # nightly only for rustfmt (rustfmt.toml uses unstable options); stable is the build toolchain
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v4
+      - run: cargo +nightly fmt --all --check
+      - run: just check-rust
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v1
+        with:
+          version: 12
+          runtime: node@24
+          cache: true
+          cache-dependency-path: web/pnpm-lock.yaml
+      - uses: extractions/setup-just@v4
+      - run: pnpm --dir web install --frozen-lockfile
+      - run: just check-web
+      - run: pnpm --dir web build
