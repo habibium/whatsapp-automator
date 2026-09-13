@@ -2,10 +2,13 @@ import { defineConfig } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import viteReact from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import stylex from '@stylexjs/unplugin'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Plugin } from 'vite'
 import { SPEC, generate } from './scripts/openapi-types.ts'
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
 function openapiTypes(): Plugin {
   const specPath = fileURLToPath(SPEC)
@@ -43,7 +46,13 @@ const config = defineConfig({
   plugins: [
     openapiTypes(),
     devtools(),
-    tailwindcss(),
+    // Unlayered product CSS beats every named Astryx layer regardless of
+    // source order, which is what `xstyle` overrides need.
+    stylex.vite({
+      useCSSLayers: false,
+      unstable_moduleResolution: { type: 'commonJS', rootDir },
+      aliases: { '@/*': [path.join(rootDir, 'src/*')] },
+    }),
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),
     viteReact(),
   ],

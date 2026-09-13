@@ -4,7 +4,7 @@
   "typescript": true,
   "packageManager": "pnpm",
   "includeExamples": false,
-  "tailwind": true,
+  "tailwind": false,
   "projectPreset": "default",
   "addOnOptions": {},
   "git": false,

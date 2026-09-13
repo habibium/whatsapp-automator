@@ -1,23 +1,20 @@
+import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { createFileRoute } from '@tanstack/react-router'
-import { CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
-import { useState } from 'react'
+import { CircleCheck } from 'lucide-react'
 import { z } from 'zod'
+import { Banner } from '@astryxdesign/core/Banner'
+import { Button } from '@astryxdesign/core/Button'
+import { FormLayout } from '@astryxdesign/core/FormLayout'
+import { Icon } from '@astryxdesign/core/Icon'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { Text } from '@astryxdesign/core/Text'
+import { VStack } from '@astryxdesign/core/VStack'
 
 import type { components } from '@/api/schema'
 
 import { $api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
-import { Alert, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
 
 export const Route = createFileRoute('/signup')({ component: Signup })
 
@@ -30,14 +27,12 @@ const signupSchema = z.object({
 })
 
 const fieldNames = ['email', 'password'] as const
-
 type FieldName = (typeof fieldNames)[number]
 
 // openapi-react-query rejects with the parsed response body rather than an Error.
 function toFieldErrors(error: unknown) {
   const details = (error as components['schemas']['ErrorBody']).details
   if (!details) return null
-
   const fields: Partial<Record<FieldName, Array<{ message: string }>>> = {}
   for (const name of fieldNames) {
     const messages = details[name]
@@ -46,6 +41,15 @@ function toFieldErrors(error: unknown) {
     }
   }
   return Object.keys(fields).length > 0 ? fields : null
+}
+
+function toStatusMessage(
+  errors: ReadonlyArray<{ message?: string } | undefined>,
+) {
+  const messages = new Set(
+    errors.flatMap((error) => (error?.message ? [error.message] : [])),
+  )
+  return messages.size > 0 ? [...messages].join('. ') : undefined
 }
 
 function Signup() {
@@ -80,15 +84,13 @@ function Signup() {
         title="Account created"
         description={`Your account for ${registeredEmail} is ready.`}
       >
-        <div className="flex flex-col items-center gap-3 py-4 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <CircleCheckIcon className="size-6" />
-          </div>
-          <p className="text-sm text-muted-foreground">
+        <VStack gap={3} hAlign="center" paddingBlock={2}>
+          <Icon icon={CircleCheck} size="lg" color="success" />
+          <Text type="body" color="secondary" justify="center">
             Signing in is not available yet, so there is nothing else to do for
             now.
-          </p>
-        </div>
+          </Text>
+        </VStack>
       </AuthLayout>
     )
   }
@@ -96,7 +98,7 @@ function Signup() {
   return (
     <AuthLayout
       title="Create your account"
-      description="Start scheduling WhatsApp messages in minutes."
+      description="Start automating WhatsApp in minutes."
     >
       <form
         noValidate
@@ -105,76 +107,91 @@ function Signup() {
           void form.handleSubmit()
         }}
       >
-        <FieldGroup>
-          <form.Field
-            name="email"
-            validators={{ onBlur: signupSchema.shape.email }}
-          >
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Email</FieldLabel>
-                  <Input
-                    id={field.name}
-                    name={field.name}
+        <VStack gap={4}>
+          {signup.isError && !signup.error.details ? (
+            <Banner
+              status="error"
+              title={signup.error.error || 'Unable to create your account'}
+            />
+          ) : null}
+
+          <FormLayout defaultOptionality="required">
+            <form.Field
+              name="email"
+              validators={{ onBlur: signupSchema.shape.email }}
+            >
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                return (
+                  <TextInput
+                    label="Email"
                     type="email"
-                    inputMode="email"
+                    htmlName={field.name}
                     autoComplete="email"
                     placeholder="you@example.com"
+                    size="lg"
                     value={field.state.value}
+                    onChange={(value) => field.handleChange(value)}
                     onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={isInvalid}
+                    status={
+                      isInvalid
+                        ? {
+                            type: 'error',
+                            message: toStatusMessage(field.state.meta.errors),
+                          }
+                        : undefined
+                    }
                   />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
-          </form.Field>
-          <form.Field
-            name="password"
-            validators={{ onBlur: signupSchema.shape.password }}
-          >
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                  <Input
-                    id={field.name}
-                    name={field.name}
+                )
+              }}
+            </form.Field>
+
+            <form.Field
+              name="password"
+              validators={{ onBlur: signupSchema.shape.password }}
+            >
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                return (
+                  <TextInput
+                    label="Password"
                     type="password"
+                    htmlName={field.name}
                     autoComplete="new-password"
+                    description="At least 8 characters."
+                    size="lg"
                     value={field.state.value}
+                    onChange={(value) => field.handleChange(value)}
                     onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={isInvalid}
+                    status={
+                      isInvalid
+                        ? {
+                            type: 'error',
+                            message: toStatusMessage(field.state.meta.errors),
+                          }
+                        : undefined
+                    }
                   />
-                  <FieldDescription>At least 8 characters.</FieldDescription>
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
-          </form.Field>
-          {signup.isError && !signup.error.details ? (
-            <Alert variant="destructive">
-              <CircleAlertIcon />
-              <AlertTitle>
-                {signup.error.error || 'Unable to create your account'}
-              </AlertTitle>
-            </Alert>
-          ) : null}
+                )
+              }}
+            </form.Field>
+          </FormLayout>
+
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating account…' : 'Create account'}
-              </Button>
+              <Button
+                type="submit"
+                label="Create account"
+                variant="primary"
+                size="lg"
+                width="100%"
+                isLoading={isSubmitting}
+              />
             )}
           </form.Subscribe>
-        </FieldGroup>
+        </VStack>
       </form>
     </AuthLayout>
   )

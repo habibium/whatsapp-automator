@@ -1,17 +1,36 @@
-import { CalendarClockIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import * as stylex from '@stylexjs/stylex'
+import { Card } from '@astryxdesign/core/Card'
+import { Center } from '@astryxdesign/core/Center'
+import { Link } from '@astryxdesign/core/Link'
+import { Heading, Text } from '@astryxdesign/core/Text'
+import { VStack } from '@astryxdesign/core/VStack'
+import { colorVars } from '@astryxdesign/core/theme/tokens.stylex'
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Wordmark } from '@/components/wordmark'
 
-type AuthLayoutProps = {
+const styles = stylex.create({
+  // Astryx leaves the body transparent, so a standalone page paints its own frame.
+  page: {
+    minHeight: '100dvh',
+    backgroundColor: colorVars['--color-background-body'],
+  },
+  // An underline running under the mark reads as a mistake on a wordmark lockup.
+  brand: {
+    textDecoration: 'none',
+    opacity: {
+      default: 1,
+      '@media (hover: hover)': {
+        default: 1,
+        ':hover': 0.75,
+      },
+    },
+  },
+})
+
+interface AuthLayoutProps {
   title: string
-  description: string
+  description: ReactNode
   children: ReactNode
   footer?: ReactNode
 }
@@ -23,27 +42,30 @@ export function AuthLayout({
   footer,
 }: AuthLayoutProps) {
   return (
-    <div className="flex min-h-svh items-center justify-center bg-muted/30 px-4 py-12">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <CalendarClockIcon className="size-6" />
-          </div>
-          <h1 className="text-xl font-semibold">WA Scheduler</h1>
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
-          </CardHeader>
-          <CardContent>{children}</CardContent>
+    <Center axis="both" padding={6} xstyle={styles.page}>
+      <VStack as="main" gap={4} hAlign="center" width="100%" maxWidth={400}>
+        <Link href="/" color="primary" xstyle={styles.brand}>
+          <Wordmark size="lg" />
+        </Link>
+
+        <Card padding={8} width="100%">
+          <VStack gap={4} hAlign="stretch">
+            <VStack gap={1} hAlign="center">
+              <Heading level={1}>{title}</Heading>
+              <Text type="body" color="secondary" justify="center">
+                {description}
+              </Text>
+            </VStack>
+            {children}
+          </VStack>
         </Card>
+
         {footer ? (
-          <div className="text-center text-sm text-muted-foreground">
+          <Text type="supporting" color="secondary" justify="center">
             {footer}
-          </div>
+          </Text>
         ) : null}
-      </div>
-    </div>
+      </VStack>
+    </Center>
   )
 }

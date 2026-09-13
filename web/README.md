@@ -19,16 +19,33 @@ pnpm build
 
 ## Styling
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+This project uses [Astryx](https://github.com/facebook/astryx) (`@astryxdesign/*`) for components
+and [StyleX](https://stylexjs.com/) for custom styling. There is no Tailwind, no CSS modules and no
+`className` utilities.
 
-### Removing Tailwind CSS
+- `src/styles.css` imports the three Astryx stylesheets in order — `@astryxdesign/core/reset.css`
+  (`@layer reset`), `@astryxdesign/core/astryx.css` (`@layer astryx-base`) and
+  `@astryxdesign/theme-neutral/theme.css` (`@layer astryx-theme`) — plus the Figtree weights the
+  theme asks for. It is imported once from `src/main.tsx`; add nothing else to it.
+- The theme is wired in `src/routes/__root.tsx` with `<Theme theme={neutralTheme}>`, and
+  `<LinkProvider component={Link}>` routes every Astryx link through TanStack Router.
+- Components come from per-name subpaths: `@astryxdesign/core/Button`, `/TextInput`, `/Card`,
+  `/VStack`, `/Center`, `/Text` (also exports `Heading`), `/Link`, `/theme`.
+- Custom styling is `stylex.create` passed to a component's `xstyle` prop; `stylex.props` only on
+  the rare DOM node Astryx has no component for. Values come from
+  `@astryxdesign/core/theme/tokens.stylex` or `var(--token)`, never raw hex or px.
+- The StyleX Vite plugin runs with `useCSSLayers: false`, so product styles stay **unlayered** and
+  therefore beat every Astryx layer regardless of source order. Do not add other unlayered global
+  CSS — it would beat the design system too.
 
-If you prefer not to use Tailwind CSS:
+The Astryx CLI is the reference for any component or prop:
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+```bash
+pnpm astryx component Button    # props + examples
+pnpm astryx search "date range"
+pnpm astryx docs tokens         # spacing, color, radius reference
+pnpm astryx doctor              # health check
+```
 
 ## Linting & Formatting
 
