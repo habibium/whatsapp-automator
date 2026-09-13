@@ -33,12 +33,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/setup@v1
+      - uses: pnpm/setup@v2
         with:
-          version: 12
+          version: "12"
           runtime: node@24
           cache: true
           cache-dependency-path: web/pnpm-lock.yaml
+          install: false
       - uses: extractions/setup-just@v4
       - run: pnpm --dir web install --frozen-lockfile
       - run: just check-web
