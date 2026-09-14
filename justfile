@@ -57,10 +57,15 @@ docker-build:
 changelog:
     git cliff --unreleased --strip all
 
-# Bump the server version, regenerate CHANGELOG.md, commit, tag vX.Y.Z and push; the Release workflow builds, deploys and publishes it
+# Bump the version, regenerate CHANGELOG.md, commit, tag vX.Y.Z and push; pre-releases (-alpha.N, -beta.N, -rc.N) from any branch, stable only from main
 release version:
     #!/usr/bin/env sh
     set -eu
+    echo "{{version}}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$' || { echo "version must look like 1.2.3 or 1.2.3-alpha.1 (alpha, beta, rc)"; exit 1; }
+    case "{{version}}" in
+        *-*) ;;
+        *) [ "$(git branch --show-current)" = main ] || { echo "stable releases are cut from main"; exit 1; } ;;
+    esac
     git diff --quiet && git diff --cached --quiet || { echo "commit or stash your changes first"; exit 1; }
     sed -i 's/^version = ".*"/version = "{{version}}"/' server/Cargo.toml
     cargo update --workspace --offline

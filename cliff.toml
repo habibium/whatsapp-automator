@@ -21,7 +21,9 @@ conventional_commits = true
 filter_unconventional = false
 split_commits = false
 protect_breaking_commits = true
-tag_pattern = "v[0-9].*"
+tag_pattern = "^(v[0-9].*|rewrite-baseline)$"
+# rewrite-baseline marks the last TypeScript commit: a boundary for release notes, never a release itself
+skip_tags = "^rewrite-baseline$"
 sort_commits = "oldest"
 # <!-- N --> prefixes are stripped by striptags and only control group order
 commit_parsers = [

@@ -6,6 +6,7 @@ on:
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
+  PRERELEASE: ${{ contains(github.ref_name, '-') }}
 
 jobs:
   image:
@@ -26,10 +27,12 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE }}
-          # flavor latest=auto adds :latest for stable semver tags and skips prereleases
+          # flavor latest=auto adds :latest for stable semver tags and skips pre-releases.
+          # The semver lines must stay first: they settle `latest` before the channel line runs.
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=match,pattern=-(alpha|beta|rc)\.\d+$,group=1,enable=${{ env.PRERELEASE }}
         env:
           # default provenance attestation makes the push an index, not a bare manifest
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
@@ -48,23 +51,31 @@ jobs:
     name: Deploy via Dokploy
     needs: image
     runs-on: ubuntu-latest
-    environment: production
+    # each environment holds the DOKPLOY_APPLICATION_ID of its channel; without one the job skips
+    environment: ${{ contains(github.ref_name, '-') && 'prerelease' || 'production' }}
     env:
       DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
       DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
       APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
       VERSION: ${{ github.ref_name }}
     steps:
-      - name: Point the application at the new image tag
+      # Dokploy is only reachable inside the tailnet
+      - uses: tailscale/github-action@v4
+        if: env.APPLICATION_ID != ''
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Point the application at the new image and deploy
+        if: env.APPLICATION_ID != ''
         run: |
-          curl --fail-with-body -sS -X POST "$DOKPLOY_URL/api/application.update" \
-            -H "x-api-key: $DOKPLOY_API_KEY" -H "content-type: application/json" \
-            -d "{\"applicationId\":\"$APPLICATION_ID\",\"dockerImage\":\"$IMAGE:${VERSION#v}\"}"
-      - name: Deploy
-        run: |
-          curl --fail-with-body -sS -X POST "$DOKPLOY_URL/api/application.deploy" \
-            -H "x-api-key: $DOKPLOY_API_KEY" -H "content-type: application/json" \
-            -d "{\"applicationId\":\"$APPLICATION_ID\",\"title\":\"$VERSION\"}"
+          # retries cover the tailnet's eventual consistency right after joining
+          dokploy() {
+            curl --fail-with-body -sS --connect-timeout 10 --retry 10 --retry-delay 6 --retry-all-errors \
+              -X POST "$DOKPLOY_URL/api/$1" -H "x-api-key: $DOKPLOY_API_KEY" -H "content-type: application/json" -d "$2"
+          }
+          dokploy application.update "{\"applicationId\":\"$APPLICATION_ID\",\"dockerImage\":\"$IMAGE:${VERSION#v}\"}"
+          dokploy application.deploy "{\"applicationId\":\"$APPLICATION_ID\",\"title\":\"$VERSION\"}"
 
   github-release:
     name: GitHub release
@@ -77,14 +88,24 @@ jobs:
         with:
           # git-cliff needs the full history and tags to diff the latest release
           fetch-depth: 0
+      # a pre-release lists the commits since the previous tag; a stable release folds in the
+      # pre-releases since the previous stable one (--latest can't: it ranges over unfiltered tags)
+      - id: range
+        run: |
+          if [ "$PRERELEASE" = true ]; then
+            echo "args=--latest" >> "$GITHUB_OUTPUT"
+          else
+            prev=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --match 'rewrite-baseline' --exclude 'v*-*' "$GITHUB_REF_NAME^")
+            echo "args=--ignore-tags='-(alpha|beta|rc)' $prev..$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
       - name: Release notes from commits
         id: changelog
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --latest --strip all
+          args: --strip all ${{ steps.range.outputs.args }}
         env:
           OUTPUT: RELEASE_NOTES.md
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --notes-file "${{ steps.changelog.outputs.changelog }}" ${{ contains(github.ref_name, '-') && '--prerelease' || '' }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --notes-file "${{ steps.changelog.outputs.changelog }}" ${{ env.PRERELEASE == 'true' && '--prerelease' || '' }}
