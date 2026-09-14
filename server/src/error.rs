@@ -12,9 +12,11 @@ use utoipa::ToSchema;
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Unauthorized")]
+    #[expect(dead_code)]
     Unauthorized,
 
     #[error("Not Found")]
+    #[expect(dead_code)]
     NotFound,
 
     #[error("Validation Failed")]
