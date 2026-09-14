@@ -1,35 +1,27 @@
 import { useState } from 'react'
-import * as stylex from '@stylexjs/stylex'
 import { useForm } from '@tanstack/react-form'
 import { createFileRoute } from '@tanstack/react-router'
-import { CircleCheck, Eye, EyeOff } from 'lucide-react'
-import { z } from 'zod'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
 import { FormLayout } from '@astryxdesign/core/FormLayout'
-import { Icon } from '@astryxdesign/core/Icon'
-import { InputGroup, InputGroupText } from '@astryxdesign/core/InputGroup'
+import { HStack } from '@astryxdesign/core/HStack'
+import { Link } from '@astryxdesign/core/Link'
+import { StatusDot } from '@astryxdesign/core/StatusDot'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Text } from '@astryxdesign/core/Text'
-import { ToggleButton } from '@astryxdesign/core/ToggleButton'
 import { VStack } from '@astryxdesign/core/VStack'
-import { colorVars } from '@astryxdesign/core/theme/tokens.stylex'
+import { z } from 'zod'
 
 import type { components } from '@/api/schema'
 
 import { $api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
+import { PasswordField } from '@/components/password-field'
 
 export const Route = createFileRoute('/signup')({ component: Signup })
 
-const styles = stylex.create({
-  // InputGroup is inline-flex, so it shrinks to its content without this.
-  passwordGroup: { display: 'flex', width: '100%' },
-  revealSlot: { paddingInline: 0 },
-  // InputGroupText does not react to the group's status, so the suffix addon
-  // would keep a neutral border while the input segment turns red.
-  revealSlotError: { borderColor: colorVars['--color-error'] },
-})
+const SIGNIN_HREF = '/signin'
+const PASSWORD_PLACEHOLDER = 'At least 8 characters'
 
 const signupSchema = z.object({
   email: z.string().trim().pipe(z.email('Enter a valid email address')),
@@ -67,8 +59,6 @@ function toStatusMessage(
 
 function Signup() {
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
-  const revealLabel = isPasswordVisible ? 'Hide password' : 'Show password'
   const signup = $api.useMutation('post', '/api/auth/signup')
 
   const form = useForm({
@@ -96,15 +86,25 @@ function Signup() {
   if (registeredEmail) {
     return (
       <AuthLayout
-        title="Account created"
-        description={`Your account for ${registeredEmail} is ready.`}
+        step="01"
+        stepLabel="Account"
+        title="Your account is ready."
+        description={
+          <>
+            We created it for <Text weight="medium">{registeredEmail}</Text>.
+          </>
+        }
       >
-        <VStack gap={3} hAlign="center" paddingBlock={2}>
-          <Icon icon={CircleCheck} size="lg" color="success" />
-          <Text type="body" color="secondary" justify="center">
-            Signing in is not available yet, so there is nothing else to do for
-            now.
+        <VStack gap={4}>
+          <HStack gap={2} vAlign="center">
+            <StatusDot variant="success" label="Account created" />
+            <Text type="label">Account created</Text>
+          </HStack>
+          <Text color="secondary">
+            The next step is linking WhatsApp by scanning a QR code. Signing in
+            is not available yet, so there is nothing else to do for now.
           </Text>
+          <Button label="Back to the homepage" variant="secondary" href="/" />
         </VStack>
       </AuthLayout>
     )
@@ -112,8 +112,19 @@ function Signup() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      description="Start automating WhatsApp in minutes."
+      step="01"
+      stepLabel="Account"
+      title="Create your account."
+      description="An email address and a password. You can link WhatsApp once the account exists."
+      action={<Button label="Sign in" variant="ghost" href={SIGNIN_HREF} />}
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link href={SIGNIN_HREF} size="sm" color="primary" hasUnderline>
+            Sign in
+          </Link>
+        </>
+      }
     >
       <form
         noValidate
@@ -122,7 +133,7 @@ function Signup() {
           void form.handleSubmit()
         }}
       >
-        <VStack gap={4}>
+        <VStack gap={6}>
           {signup.isError && !signup.error.details ? (
             <Banner
               status="error"
@@ -149,8 +160,6 @@ function Signup() {
                     value={field.state.value}
                     onChange={(value) => field.handleChange(value)}
                     onBlur={field.handleBlur}
-                    // InputGroup only renders detached messages; keep both fields alike.
-                    statusVariant="detached"
                     status={
                       isInvalid
                         ? {
@@ -172,54 +181,17 @@ function Signup() {
                 const isInvalid =
                   field.state.meta.isTouched && !field.state.meta.isValid
                 return (
-                  <InputGroup
+                  <PasswordField
                     label="Password"
-                    description="At least 8 characters."
-                    size="lg"
-                    xstyle={styles.passwordGroup}
-                    status={
-                      isInvalid
-                        ? {
-                            type: 'error',
-                            message: toStatusMessage(field.state.meta.errors),
-                          }
-                        : undefined
-                    }
-                  >
-                    <TextInput
-                      // A grouped input is named "<group label> <own label>",
-                      // so repeating "Password" here would stutter.
-                      label="Entry"
-                      type={isPasswordVisible ? 'text' : 'password'}
-                      htmlName={field.name}
-                      autoComplete="new-password"
-                      value={field.state.value}
-                      onChange={(value) => field.handleChange(value)}
-                      onBlur={field.handleBlur}
-                      // The group renders the message; this only paints the
-                      // border and sets aria-invalid on the input itself.
-                      status={isInvalid ? { type: 'error' } : undefined}
-                    />
-                    <InputGroupText
-                      xstyle={[
-                        styles.revealSlot,
-                        isInvalid && styles.revealSlotError,
-                      ]}
-                    >
-                      <ToggleButton
-                        isIconOnly
-                        // ToggleButton forwards size to Button directly, so it
-                        // never picks up the group's size context.
-                        size="lg"
-                        label={revealLabel}
-                        tooltip={revealLabel}
-                        icon={<Icon icon={Eye} color="inherit" />}
-                        pressedIcon={<Icon icon={EyeOff} color="inherit" />}
-                        isPressed={isPasswordVisible}
-                        onPressedChange={setIsPasswordVisible}
-                      />
-                    </InputGroupText>
-                  </InputGroup>
+                    placeholder={PASSWORD_PLACEHOLDER}
+                    htmlName={field.name}
+                    autoComplete="new-password"
+                    value={field.state.value}
+                    onChange={(value) => field.handleChange(value)}
+                    onBlur={field.handleBlur}
+                    isInvalid={isInvalid}
+                    errorMessage={toStatusMessage(field.state.meta.errors)}
+                  />
                 )
               }}
             </form.Field>

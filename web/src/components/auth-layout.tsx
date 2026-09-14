@@ -1,74 +1,64 @@
 import type { ReactNode } from 'react'
 import * as stylex from '@stylexjs/stylex'
-import { Card } from '@astryxdesign/core/Card'
-import { Center } from '@astryxdesign/core/Center'
-import { Link } from '@astryxdesign/core/Link'
+import { Divider } from '@astryxdesign/core/Divider'
 import { Heading, Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
-import { colorVars } from '@astryxdesign/core/theme/tokens.stylex'
 
-import { ThemeToggle } from '@/components/theme-toggle'
-import { Wordmark } from '@/components/wordmark'
+import { SectionIndex } from '@/components/section-index'
+import { SiteFrame } from '@/components/site-frame'
+
+const COLUMN_WIDTH = 400
 
 const styles = stylex.create({
-  // Astryx leaves the body transparent, so a standalone page paints its own frame.
-  page: {
-    minHeight: '100dvh',
-    backgroundColor: colorVars['--color-background-body'],
-  },
-  // An underline running under the mark reads as a mistake on a wordmark lockup.
-  brand: {
-    textDecoration: 'none',
-    opacity: {
-      default: 1,
-      '@media (hover: hover)': {
-        default: 1,
-        ':hover': 0.75,
-      },
-    },
-  },
+  fill: { minHeight: '100%' },
 })
 
 interface AuthLayoutProps {
+  /** Position in the account flow: 01 account, 02 verify, 03 link WhatsApp. */
+  step: string
+  stepLabel: string
   title: string
   description: ReactNode
   children: ReactNode
+  action?: ReactNode
   footer?: ReactNode
 }
 
 export function AuthLayout({
+  step,
+  stepLabel,
   title,
   description,
   children,
+  action,
   footer,
 }: AuthLayoutProps) {
   return (
-    <Center axis="both" padding={6} xstyle={styles.page}>
-      <VStack as="main" gap={4} hAlign="center" width="100%" maxWidth={400}>
-        <Link href="/" color="primary" xstyle={styles.brand}>
-          <Wordmark size="lg" />
-        </Link>
-
-        <Card padding={8} width="100%">
-          <VStack gap={4} hAlign="stretch">
-            <VStack gap={1} hAlign="center">
-              <Heading level={1}>{title}</Heading>
-              <Text type="body" color="secondary" justify="center">
-                {description}
-              </Text>
+    <SiteFrame action={action}>
+      <VStack
+        hAlign="center"
+        paddingBlock={10}
+        vAlign="center"
+        xstyle={styles.fill}
+      >
+        <VStack gap={6} maxWidth={COLUMN_WIDTH} width="100%">
+          <VStack gap={5}>
+            <SectionIndex index={step} label={stepLabel} />
+            <VStack gap={3}>
+              <Heading level={1} type="display-3" textWrap="balance">
+                {title}
+              </Heading>
+              <Text color="secondary">{description}</Text>
             </VStack>
-            {children}
           </VStack>
-        </Card>
 
-        {footer ? (
-          <Text type="supporting" color="secondary" justify="center">
-            {footer}
-          </Text>
-        ) : null}
+          <Divider />
 
-        <ThemeToggle />
+          {children}
+
+          {footer ? <Text type="supporting">{footer}</Text> : null}
+        </VStack>
       </VStack>
-    </Center>
+    </SiteFrame>
   )
 }
