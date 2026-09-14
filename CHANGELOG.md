@@ -1,34 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.0-alpha.1] - 2026-09-14
 
 ### Features
 
-- Implement scheduled messaging functionality with cron jobs (da5fd6b)
-- Implement single file authentication state for WhatsApp bot (84e8e1d)
-- Enhance TypeScript configuration with additional strictness options (72ff702)
-- Configure pino logger to use pino-pretty for improved logging output (a8a34cf)
-- Implement functional prototype with hono server and react frontend (98aed59)
-- Add footer component and integrate it into layout and authentication pages (bf15320)
-- Add GroupCombobox and TemplateVariableChips components (694ce92)
-- Add .env.dev file and update docker-compose for environment variable support (58f600f)
-- Add dotenv configuration for environment variables support (2a94fb4)
-- Enhance CronScheduleBuilder to support second-based scheduling (5fb7a3e)
-- Add password visibility toggle in Login and Register pages (0741700)
-- Integrate Zustand for state management in auth and messages (aefe01c)
-- Use tanstack query, axios, and sonner (bd32611)
-- Add ThemeProvider component and integrate theme selection in Header (8e5e63b)
-- Update start script path and add timezone endpoint to API (f9a877e)
-- Add server timezone API and integrate into MessageFormPage (1efb83d)
-- Set up Docker environment with Dockerfile and docker-compose, update README and package scripts for Turborepo integration (133dfcb)
-- Migrate auth to better-auth, add password reset support, email verification, and make auth more robust. (1bdd8ed)
-- Refactor CORS and origin validation logic for better maintainability (18b8c32)
-- Add email verification flow, enhance auth alerts, and configure database URL in Docker (355b7d0)
-- Add connecting state handling to WhatsApp connection events and update store for connection status (bbc8e61)
-- Implement WhatsApp connection component with QR code and connection states (4e30369)
-- Integrate react-hook-form and zod for form validation in MessageFormPage, add Field components for better structure (540181e)
-- Add croner and cronstrue for enhanced cron scheduling functionality (b122eea)
-- Full project rewrite (121e01b)
 - Implement authentication routes and UI components for sign-in and sign-up, including form validation and user feedback (8fdac2a)
 - Setup vite proxy (e1012a2)
 - Integrate anyhow for error handling in main function and update dependencies (9e735c7)
@@ -46,21 +21,18 @@
 - Add signup ui (147e2b6)
 - Add health endpoint (a5cdccb)
 - Create config module (23dd74f)
+- Add CI workflow for Rust and Web projects (4981139)
+- Add Dockerfile, release workflow, and changelog configuration (acc9453)
+- Move the stylex and astryx (595382e)
+- Imeplement theme toggle (3537579)
+- Enhance release workflow for pre-releases and version validation (22e7ba3)
 
 ### Bug Fixes
 
-- Resolve QR code not reappearing after page refresh (bed26b7)
-- Update React and related dependencies to latest versions for improved performance and compatibility (c93d4e7)
-- Fix lint errors (7266409)
-- Update README and package.json for Bun and Node.js usage clarification (c60fa19)
-- Update alert component styles and change event type in LoginPage (53ae411)
-- Update AlertDescription class for consistent text color styling (9a22db9)
-- Update environment configuration and API URL handling (556cc5d)
-- Fix WhatsApp connect/disconnect handling (3984b59)
+- **lint:** Fix rust lints (417c17c)
 
 ### Refactoring
 
-- Login and Register pages to use react-query for mutations and improve error handling (3b54fe8)
 - Update Vite configuration and remove wrangler.jsonc (dfe442d)
 - Remove unused import in main.rs (f06ae9b)
 - Move the api routes to lib (a3cdf9c)
@@ -69,31 +41,11 @@
 
 ### Documentation
 
-- Expand README with project overview, tech stack, setup instructions, and project structure (2937eda)
 - Add AGENTS.md for skill loading instructions and reference in CLAUDE.md (b9db80c)
+- Update README.md for clarity and add new commands (543d68a)
 
 ### Maintenance
 
-- Setup project (df0ce67)
-- Install whatsapp-web.js and node-cron (0b771d8)
-- Add puppeteer to onlyBuiltDependencies (895e1df)
-- Update VSCode settings to configure code actions on save (a2e9d3b)
-- Add LICENSE file with copyright and permissions (666b506)
-- Install hono (a20233b)
-- Add .npmrc for engine strictness and update package.json with engines field (0f45ebf)
-- Remove noUncheckedIndexedAccess option from TypeScript configuration (b813dfb)
-- Update pnpm-workspace.yaml to include additional built dependencies (baileys, protobufjs, sharp) (fd691bf)
-- Update .gitignore to include tsconfig.tsbuildinfo and remove obsolete TypeScript build info file (16b9006)
-- Update TypeScript configuration and modify Vite scripts to include host option (4d8b16e)
-- Migrate from pnpm to bun (49b14f5)
-- Update environment configuration and build scripts for improved development workflow (b3d7acb)
-- Add Docker support with development and production configurations, update environment variables, and enhance .dockerignore (0fa6525)
-- Remove Docker setup and related files (63ea51e)
-- Improve spacing and sizing of icons (be947ec)
-- Add calendar, tabs, toggle, toggle-group component (0568313)
-- Update database URL in .env.example and add environment variable for start script in package.json (f42e563)
-- Migrate from biome to oxc (d689e64)
-- Add db:push and db:studio scripts (5c9a6ce)
 - Start fresh (2cd0e0c)
 - Init (1968c10)
 - Setup workspace for apps (aaef8ad)
@@ -127,14 +79,12 @@
 - Install shadcn components, zod, and tanstack form (994596f)
 - Serve static web content using tower (2da48a9)
 - Update sqlx cache (8d40fb3)
+- Update pnpm setup action to version 2 and adjust configuration (fe155e8)
+- Update CHANGELOG.md (dd4195f)
+- Format README (8c71052)
 
 ### Other
 
-- Init (e09f3c9)
-- Merge branch 'main' of github.com:habibium/whatsapp-message-scheduler (1b3390a)
-- Refactor code structure for improved readability and maintainability (c409eed)
-- Refactor code structure for improved readability and maintainability (3149bcc)
-- Fix tunneled dev API routing (6c39ce8)
 - Update .gitignore (0a769cf)
 - Update package.json (10eb32f)
 - Update pnpm-workspace.yaml (0f7342e)
