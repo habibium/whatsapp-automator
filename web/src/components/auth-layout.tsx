@@ -7,6 +7,7 @@ import { Heading, Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { colorVars } from '@astryxdesign/core/theme/tokens.stylex'
 
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Wordmark } from '@/components/wordmark'
 
 const styles = stylex.create({
@@ -65,6 +66,8 @@ export function AuthLayout({
             {footer}
           </Text>
         ) : null}
+
+        <ThemeToggle />
       </VStack>
     </Center>
   )

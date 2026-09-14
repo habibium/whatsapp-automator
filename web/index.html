@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WhatsApp Automator</title>
+    <script>
+      // Paints the blank page in the stored scheme before any CSS or JS loads.
+      // Key must match STORAGE_KEY in src/lib/theme.ts.
+      try {
+        var pref = localStorage.getItem('wa-color-scheme')
+        document.documentElement.style.colorScheme =
+          pref === 'light' || pref === 'dark' ? pref : 'light dark'
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -15,6 +15,7 @@ import { Section } from '@astryxdesign/core/Section'
 import { Heading, Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { colorVars, spacingVars } from '@astryxdesign/core/theme/tokens.stylex'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { PRODUCT_NAME, Wordmark } from '@/components/wordmark'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -80,13 +81,16 @@ function Home() {
       xstyle={styles.page}
       header={
         <LayoutHeader role="banner">
-          <HStack gap={4} justify="between" vAlign="center">
+          <HStack gap={4} justify="between" vAlign="center" wrap="wrap">
             <Wordmark />
-            <Button
-              label="Create account"
-              variant="secondary"
-              href={SIGNUP_HREF}
-            />
+            <HStack gap={3} vAlign="center">
+              <ThemeToggle />
+              <Button
+                label="Create account"
+                variant="secondary"
+                href={SIGNUP_HREF}
+              />
+            </HStack>
           </HStack>
         </LayoutHeader>
       }

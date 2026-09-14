@@ -1,15 +1,19 @@
 import { useState } from 'react'
+import * as stylex from '@stylexjs/stylex'
 import { useForm } from '@tanstack/react-form'
 import { createFileRoute } from '@tanstack/react-router'
-import { CircleCheck } from 'lucide-react'
+import { CircleCheck, Eye, EyeOff } from 'lucide-react'
 import { z } from 'zod'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
 import { FormLayout } from '@astryxdesign/core/FormLayout'
 import { Icon } from '@astryxdesign/core/Icon'
+import { InputGroup, InputGroupText } from '@astryxdesign/core/InputGroup'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Text } from '@astryxdesign/core/Text'
+import { ToggleButton } from '@astryxdesign/core/ToggleButton'
 import { VStack } from '@astryxdesign/core/VStack'
+import { colorVars } from '@astryxdesign/core/theme/tokens.stylex'
 
 import type { components } from '@/api/schema'
 
@@ -17,6 +21,15 @@ import { $api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
 
 export const Route = createFileRoute('/signup')({ component: Signup })
+
+const styles = stylex.create({
+  // InputGroup is inline-flex, so it shrinks to its content without this.
+  passwordGroup: { display: 'flex', width: '100%' },
+  revealSlot: { paddingInline: 0 },
+  // InputGroupText does not react to the group's status, so the suffix addon
+  // would keep a neutral border while the input segment turns red.
+  revealSlotError: { borderColor: colorVars['--color-error'] },
+})
 
 const signupSchema = z.object({
   email: z.string().trim().pipe(z.email('Enter a valid email address')),
@@ -54,6 +67,8 @@ function toStatusMessage(
 
 function Signup() {
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  const revealLabel = isPasswordVisible ? 'Hide password' : 'Show password'
   const signup = $api.useMutation('post', '/api/auth/signup')
 
   const form = useForm({
@@ -134,6 +149,8 @@ function Signup() {
                     value={field.state.value}
                     onChange={(value) => field.handleChange(value)}
                     onBlur={field.handleBlur}
+                    // InputGroup only renders detached messages; keep both fields alike.
+                    statusVariant="detached"
                     status={
                       isInvalid
                         ? {
@@ -155,16 +172,11 @@ function Signup() {
                 const isInvalid =
                   field.state.meta.isTouched && !field.state.meta.isValid
                 return (
-                  <TextInput
+                  <InputGroup
                     label="Password"
-                    type="password"
-                    htmlName={field.name}
-                    autoComplete="new-password"
                     description="At least 8 characters."
                     size="lg"
-                    value={field.state.value}
-                    onChange={(value) => field.handleChange(value)}
-                    onBlur={field.handleBlur}
+                    xstyle={styles.passwordGroup}
                     status={
                       isInvalid
                         ? {
@@ -173,7 +185,41 @@ function Signup() {
                           }
                         : undefined
                     }
-                  />
+                  >
+                    <TextInput
+                      // A grouped input is named "<group label> <own label>",
+                      // so repeating "Password" here would stutter.
+                      label="Entry"
+                      type={isPasswordVisible ? 'text' : 'password'}
+                      htmlName={field.name}
+                      autoComplete="new-password"
+                      value={field.state.value}
+                      onChange={(value) => field.handleChange(value)}
+                      onBlur={field.handleBlur}
+                      // The group renders the message; this only paints the
+                      // border and sets aria-invalid on the input itself.
+                      status={isInvalid ? { type: 'error' } : undefined}
+                    />
+                    <InputGroupText
+                      xstyle={[
+                        styles.revealSlot,
+                        isInvalid && styles.revealSlotError,
+                      ]}
+                    >
+                      <ToggleButton
+                        isIconOnly
+                        // ToggleButton forwards size to Button directly, so it
+                        // never picks up the group's size context.
+                        size="lg"
+                        label={revealLabel}
+                        tooltip={revealLabel}
+                        icon={<Icon icon={Eye} color="inherit" />}
+                        pressedIcon={<Icon icon={EyeOff} color="inherit" />}
+                        isPressed={isPasswordVisible}
+                        onPressedChange={setIsPasswordVisible}
+                      />
+                    </InputGroupText>
+                  </InputGroup>
                 )
               }}
             </form.Field>
