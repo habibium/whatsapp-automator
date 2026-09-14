@@ -11,17 +11,17 @@ pnpm dev
 
 ## Commands
 
-| Script               | What it does                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| `pnpm dev`           | Vite dev server on http://localhost:5173 with `/api` proxied to the backend        |
-| `pnpm build`         | Production build into `dist/`                                                      |
-| `pnpm preview`       | Serve the production build locally                                                 |
-| `pnpm typecheck`     | `tsc --noEmit`                                                                     |
-| `pnpm lint`          | oxlint                                                                             |
-| `pnpm check`         | oxfmt formatting check                                                             |
-| `pnpm format`        | Format with oxfmt and apply oxlint fixes                                           |
-| `pnpm gen:api`       | Regenerate `src/api/schema.d.ts` from `../openapi.json`; `--check` verifies it     |
-| `pnpm astryx <cmd>`  | Astryx CLI: component docs, search, templates                                      |
+| Script              | What it does                                                                   |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `pnpm dev`          | Vite dev server on http://localhost:5173 with `/api` proxied to the backend    |
+| `pnpm build`        | Production build into `dist/`                                                  |
+| `pnpm preview`      | Serve the production build locally                                             |
+| `pnpm typecheck`    | `tsc --noEmit`                                                                 |
+| `pnpm lint`         | oxlint                                                                         |
+| `pnpm check`        | oxfmt formatting check                                                         |
+| `pnpm format`       | Format with oxfmt and apply oxlint fixes                                       |
+| `pnpm gen:api`      | Regenerate `src/api/schema.d.ts` from `../openapi.json`; `--check` verifies it |
+| `pnpm astryx <cmd>` | Astryx CLI: component docs, search, templates                                  |
 
 ## API client
 
