@@ -69,8 +69,9 @@ release version:
     git diff --quiet && git diff --cached --quiet || { echo "commit or stash your changes first"; exit 1; }
     sed -i 's/^version = ".*"/version = "{{version}}"/' server/Cargo.toml
     cargo update --workspace --offline
+    just gen-api
     git cliff --tag "v{{version}}" -o CHANGELOG.md
-    git add server/Cargo.toml Cargo.lock CHANGELOG.md
+    git add server/Cargo.toml Cargo.lock openapi.json web/src/api/schema.d.ts CHANGELOG.md
     git commit -m "chore: release v{{version}}"
     git tag -a "v{{version}}" -m "v{{version}}"
     git push origin HEAD "v{{version}}"
