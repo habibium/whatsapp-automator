@@ -8,10 +8,12 @@ import { Theme } from '@astryxdesign/core/theme'
 import { LinkProvider } from '@astryxdesign/core/Link'
 import { neutralTheme } from '@astryxdesign/theme-neutral/built'
 
+import { NotFound } from '@/components/not-found'
 import { useColorScheme } from '@/lib/theme'
 
 export const Route = createRootRoute({
   component: RootComponent,
+  notFoundComponent: NotFound,
 })
 
 const queryClient = new QueryClient()

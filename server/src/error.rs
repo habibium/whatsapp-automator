@@ -16,7 +16,6 @@ pub enum AppError {
     Unauthorized,
 
     #[error("Not Found")]
-    #[expect(dead_code)]
     NotFound,
 
     #[error("Validation Failed")]
