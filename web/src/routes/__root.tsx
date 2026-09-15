@@ -34,6 +34,7 @@ function RootComponent() {
           <TanStackDevtools
             config={{
               position: 'bottom-right',
+              triggerMode: 'fixed',
             }}
             plugins={[
               {
