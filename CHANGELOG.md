@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.0-alpha.3] - 2026-09-16
+
+### Maintenance
+
+- Move version and edition to workspace root (5e13337)
+- Add compression and caching headers for web assets (4185851)
 ## [0.1.0-alpha.2] - 2026-09-16
 
 ### Features
