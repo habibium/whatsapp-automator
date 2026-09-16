@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.0-alpha.2] - 2026-09-16
+
+### Features
+
+- **web:** Add site frame, section index and wordmark for the new design (9a4691f)
+- **web:** Redesign the marketing homepage (771e98d)
+- **web:** Add password field with inline reveal and attached status (6810eb5)
+- **web:** Redesign the auth layout and signup form (552499b)
+- **web:** Set trigger mode to fixed for TanStack Devtools (e9b509b)
+- Implement 404 (ab362e2)
 ## [0.1.0-alpha.1] - 2026-09-14
 
 ### Features
@@ -82,6 +92,7 @@
 - Update pnpm setup action to version 2 and adjust configuration (fe155e8)
 - Update CHANGELOG.md (dd4195f)
 - Format README (8c71052)
+- Update Dockerfile, and justfile (6c99f12)
 
 ### Other
 
