@@ -15,14 +15,12 @@ import {
   colorVars,
   durationVars,
   easeVars,
-  fontWeightVars,
   spacingVars,
   textSizeVars,
 } from '@astryxdesign/core/theme/tokens.stylex'
 
 import type { TableColumn } from '@astryxdesign/core/Table'
 
-import { SectionIndex } from '@/components/section-index'
 import { SiteFrame } from '@/components/site-frame'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -134,23 +132,6 @@ const fadeUp = stylex.keyframes({
 })
 
 const styles = stylex.create({
-  tracked: {
-    fontWeight: fontWeightVars['--font-weight-medium'],
-    letterSpacing: '0.09em',
-    textTransform: 'uppercase',
-  },
-  // A narrow index column in the margin, the way a Swiss grid numbers its parts.
-  // Baseline alignment sits the number on the heading's own first baseline;
-  // matching the box tops instead leaves it 3px high, which reads as a slip.
-  sectionGrid: {
-    alignItems: 'baseline',
-    columnGap: spacingVars['--spacing-12'],
-    gridTemplateColumns: {
-      default: 'minmax(0, 1fr)',
-      '@media (min-width: 900px)': '150px minmax(0, 1fr)',
-    },
-    rowGap: spacingVars['--spacing-6'],
-  },
   defRow: {
     borderTopColor: colorVars['--color-border'],
     borderTopStyle: 'solid',
@@ -316,44 +297,30 @@ const compactColumns: TableColumn<Run>[] = [
 ]
 
 interface PageSectionProps {
-  index: string
-  label: string
   headingId: string
   title: string
   lede: string
   children: ReactNode
 }
 
-function PageSection({
-  index,
-  label,
-  headingId,
-  title,
-  lede,
-  children,
-}: PageSectionProps) {
+function PageSection({ headingId, title, lede, children }: PageSectionProps) {
   return (
-    <VStack as="section" aria-labelledby={headingId} paddingBlock={10}>
-      <Grid xstyle={styles.sectionGrid}>
-        <SectionIndex index={index} label={label} />
-        <VStack gap={8}>
-          <VStack gap={3}>
-            <Heading
-              id={headingId}
-              level={2}
-              type="display-3"
-              textWrap="balance"
-              xstyle={styles.headline}
-            >
-              {title}
-            </Heading>
-            <Text color="secondary" size="lg" xstyle={styles.measure}>
-              {lede}
-            </Text>
-          </VStack>
-          {children}
-        </VStack>
-      </Grid>
+    <VStack as="section" aria-labelledby={headingId} gap={8} paddingBlock={10}>
+      <VStack gap={3}>
+        <Heading
+          id={headingId}
+          level={2}
+          type="display-3"
+          textWrap="balance"
+          xstyle={styles.headline}
+        >
+          {title}
+        </Heading>
+        <Text color="secondary" size="lg" xstyle={styles.measure}>
+          {lede}
+        </Text>
+      </VStack>
+      {children}
     </VStack>
   )
 }
@@ -382,9 +349,6 @@ function Home() {
           paddingBlockStart={10}
         >
           <VStack gap={5} xstyle={styles.reveal}>
-            <Text type="supporting" xstyle={styles.tracked}>
-              Scheduling · Auto-replies · Broadcasts
-            </Text>
             <Heading
               id="hero-title"
               level={1}
@@ -420,8 +384,6 @@ function Home() {
         <Divider />
 
         <PageSection
-          index="01"
-          label="Live view"
           headingId="live-view"
           title="Everything it did today, on one line each."
           lede="Scheduled sends, auto-replies and broadcasts land in the same log, so you can tell at a glance what ran, what is waiting, and what is answering right now."
@@ -471,8 +433,6 @@ function Home() {
         <Divider />
 
         <PageSection
-          index="02"
-          label="Capabilities"
           headingId="capabilities"
           title="Four things, each done properly."
           lede="No rule engine to learn and no automation that acts on its own. You describe what should happen; the account stays yours."
@@ -492,8 +452,6 @@ function Home() {
         <Divider />
 
         <PageSection
-          index="03"
-          label="How it works"
           headingId="how-it-works"
           title="Three steps, then it runs without you."
           lede="Linking takes about a minute. After that the schedule runs on its own, and every send stays yours to change or stop."
@@ -511,8 +469,6 @@ function Home() {
         <Divider />
 
         <PageSection
-          index="04"
-          label="Get started"
           headingId="get-started"
           title="Link your account and schedule the first message."
           lede="Creating an account takes an email address and a password. You can connect WhatsApp straight after, or come back to it later."

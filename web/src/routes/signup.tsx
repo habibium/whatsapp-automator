@@ -86,8 +86,6 @@ function Signup() {
   if (registeredEmail) {
     return (
       <AuthLayout
-        step="01"
-        stepLabel="Account"
         title="Your account is ready."
         description={
           <>
@@ -112,8 +110,6 @@ function Signup() {
 
   return (
     <AuthLayout
-      step="01"
-      stepLabel="Account"
       title="Create your account."
       description="An email address and a password. You can link WhatsApp once the account exists."
       action={<Button label="Sign in" variant="ghost" href={SIGNIN_HREF} />}

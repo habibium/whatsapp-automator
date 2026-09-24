@@ -12,7 +12,6 @@ import {
   textSizeVars,
 } from '@astryxdesign/core/theme/tokens.stylex'
 
-import { SectionIndex } from '@/components/section-index'
 import { SiteFrame } from '@/components/site-frame'
 
 const COLUMN_WIDTH = 560
@@ -72,22 +71,19 @@ export function NotFound() {
     >
       <VStack minHeight="100%" paddingBlock={10} vAlign="center">
         <VStack gap={8} maxWidth={COLUMN_WIDTH}>
-          <VStack gap={5} xstyle={styles.reveal}>
-            <SectionIndex index="404" label="Page not found" />
-            <VStack gap={3}>
-              <Heading
-                level={1}
-                type="display-1"
-                textWrap="balance"
-                xstyle={styles.title}
-              >
-                There is nothing at this address.
-              </Heading>
-              <Text color="secondary" size="lg" xstyle={styles.measure}>
-                The link that brought you here may be out of date, or the
-                address mistyped. Nothing has gone wrong with your account.
-              </Text>
-            </VStack>
+          <VStack gap={3} xstyle={styles.reveal}>
+            <Heading
+              level={1}
+              type="display-1"
+              textWrap="balance"
+              xstyle={styles.title}
+            >
+              There is nothing at this address.
+            </Heading>
+            <Text color="secondary" size="lg" xstyle={styles.measure}>
+              The link that brought you here may be out of date, or the address
+              mistyped. Nothing has gone wrong with your account.
+            </Text>
           </VStack>
 
           <VStack gap={6} xstyle={[styles.reveal, styles.revealLate]}>

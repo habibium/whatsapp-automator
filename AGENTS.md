@@ -15,6 +15,8 @@ These override the CLI-managed Astryx block below wherever they disagree.
 - Values come from `@astryxdesign/core/theme/tokens.stylex` (e.g. `colorVars['--color-accent']`) or
   `var(--token)`. Never raw hex or px for color and spacing.
 - Wrap every `:hover` style in `@media (hover: hover)`.
+- No eyebrows: no small uppercase/tracked labels, numbered section indexes or taglines above a
+  heading. A heading opens its section on its own.
 - Product StyleX is unlayered on purpose (`useCSSLayers: false` in `web/vite.config.ts`) so it
   outranks `reset` / `astryx-base` / `astryx-theme`. Never add other unlayered global CSS, it would
   outrank the design system too. `web/src/styles.css` is the only global stylesheet.
