@@ -144,11 +144,16 @@
       "Health": {
         "type": "object",
         "required": [
-          "status"
+          "status",
+          "version"
         ],
         "properties": {
           "status": {
             "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "description": "Lets a deploy tell when the new release is the one answering"
           }
         }
       },

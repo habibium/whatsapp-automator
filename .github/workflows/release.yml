@@ -76,6 +76,35 @@ jobs:
           }
           dokploy application.update "{\"applicationId\":\"$APPLICATION_ID\",\"dockerImage\":\"$IMAGE:${VERSION#v}\"}"
           dokploy application.deploy "{\"applicationId\":\"$APPLICATION_ID\",\"title\":\"$VERSION\"}"
+      # opt-in: PUBLIC_URL and CLOUDFLARE_ZONE_ID variables plus a CLOUDFLARE_CACHE_PURGE_TOKEN secret on
+      # the environment, for a Cloudflare setup that caches the SPA shell under the cache tag app-shell
+      - name: Purge the cached app shell once the new version answers
+        if: env.APPLICATION_ID != '' && vars.PUBLIC_URL != '' && vars.CLOUDFLARE_ZONE_ID != ''
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+        run: |
+          want="${VERSION#v}" streak=0
+          for _ in $(seq 90); do
+            live=$(curl -fsS --max-time 10 "$PUBLIC_URL/api/health" | jq -r '.version // empty' || true)
+            if [ "$live" = "$want" ]; then streak=$((streak + 1)); else streak=0; fi
+            [ "$streak" -ge 3 ] && break
+            sleep 10
+          done
+          if [ "$streak" -lt 3 ]; then
+            echo "::error::$PUBLIC_URL never settled on $want (last answer: ${live:-none})"
+            exit 1
+          fi
+          purge() {
+            curl --fail-with-body -sS -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+              -H "Authorization: Bearer $CLOUDFLARE_CACHE_PURGE_TOKEN" -H "content-type: application/json" \
+              -d '{"tags":["app-shell"]}'
+          }
+          purge
+          # the draining old task can still answer and re-cache its shell until the rolling update ends
+          sleep 60
+          purge
 
   github-release:
     name: GitHub release

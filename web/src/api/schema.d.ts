@@ -60,6 +60,8 @@ export interface components {
         };
         Health: {
             status: string;
+            /** @description Lets a deploy tell when the new release is the one answering */
+            version: string;
         };
         UserResponse: {
             /** Format: date-time */
