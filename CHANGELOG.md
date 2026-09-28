@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0-alpha.4] - 2026-09-28
+
+### Features
+
+- Add version field to health check response and OpenAPI schema (2fc0eee)
+
+### Refactoring
+
+- Remove unused import (95d1afa)
+
+### Other
+
+- Remove eyebrows (52cb63a)
 ## [0.1.0-alpha.3] - 2026-09-16
 
 ### Maintenance
