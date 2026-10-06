@@ -4,6 +4,7 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import stylex from '@stylexjs/unplugin'
 import { compression, defineAlgorithm } from 'vite-plugin-compression2'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { constants as zlib } from 'node:zlib'
@@ -11,6 +12,8 @@ import type { HtmlTagDescriptor, Plugin } from 'vite'
 import { SPEC, generate } from './scripts/openapi-types.ts'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
+// openapi.json carries the Cargo workspace version; CI fails if it drifts
+const appVersion: string = JSON.parse(readFileSync(SPEC, 'utf8')).info.version
 
 function openapiTypes(): Plugin {
   const specPath = fileURLToPath(SPEC)
@@ -88,6 +91,7 @@ function preloadCriticalAssets(): Plugin {
 }
 
 const config = defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   server: {
     allowedHosts: ['ezown-dev.naxata.com'],
     proxy: {

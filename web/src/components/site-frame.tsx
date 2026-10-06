@@ -22,6 +22,8 @@ import { PRODUCT_NAME, Wordmark } from '@/components/wordmark'
 export const FRAME_PADDING = 6
 export const FRAME_WIDTH = 1080
 
+const CURRENT_YEAR = new Date().getFullYear()
+
 const styles = stylex.create({
   // Astryx leaves the body transparent, so the frame paints the page and
   // stretches Layout's column to the viewport on short pages.
@@ -77,7 +79,7 @@ export function SiteFrame({ action, children }: SiteFrameProps) {
       footer={
         <LayoutFooter role="contentinfo" hasDivider>
           <HStack gap={4} justify="between" vAlign="center" wrap="wrap">
-            <Text type="supporting">© 2026 {PRODUCT_NAME}</Text>
+            <Text type="supporting">v{__APP_VERSION__}</Text>
             <ThemeToggle />
           </HStack>
         </LayoutFooter>
