@@ -62,19 +62,22 @@ Run `just` alone to list recipes.
 
 Environment variables, or a `.env` file in development (see `.env.example`):
 
-| Variable       | Default                                                             | Purpose                                                                                          |
-| -------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL` | required                                                            | Postgres connection string                                                                       |
-| `PORT`         | `8000`                                                              | Listen port                                                                                      |
-| `WEB_DIR`      | `web/dist`                                                          | Built SPA to serve for non-`/api` paths                                                          |
-| `RUST_LOG`     | `info,server=debug,…`                                               | tracing filter                                                                                   |
-| `APP_URL`      | required in release builds; `http://localhost:5173` in debug builds | Public URL of the app. Links in emails point here, and an `https` URL makes the cookies `Secure` |
-| `SMTP_URL`     | required when `APP_URL` is `https`                                  | SMTP server for verification and password reset emails, e.g. `smtps://user:password@host:465`    |
-| `EMAIL_FROM`   | required with SMTP                                                  | Sender, e.g. `WhatsApp Automator <no-reply@example.com>`                                         |
+| Variable         | Default                                                             | Purpose                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`   | required                                                            | Postgres connection string                                                                                                       |
+| `PORT`           | `8000`                                                              | Listen port                                                                                                                      |
+| `WEB_DIR`        | `web/dist`                                                          | Built SPA to serve for non-`/api` paths                                                                                          |
+| `RUST_LOG`       | `info,server=debug,…`                                               | tracing filter                                                                                                                   |
+| `APP_URL`        | required in release builds; `http://localhost:5173` in debug builds | Public URL of the app. Links in emails point here, and an `https` URL makes the cookies `Secure`                                 |
+| `SMTP_URL`       | required when `APP_URL` is `https`                                  | SMTP server for verification and password reset emails, e.g. `smtps://user:password@host:465`                                    |
+| `EMAIL_FROM`     | required with SMTP                                                  | Sender, e.g. `WhatsApp Automator <no-reply@example.com>`                                                                         |
+| `ENCRYPTION_KEY` | required in release builds; a fixed development key in debug builds | Encrypts secrets kept in the database, such as authenticator app keys: 32 random bytes in base64, from `openssl rand -base64 32` |
 
 Migrations in `server/migrations` are embedded in the binary and applied at startup.
 
 Without `SMTP_URL` the server writes each email, link included, to its log, which is enough for development and refused for an `https` `APP_URL`, since anyone who can read the log could use the links. Percent-encode special characters in the SMTP password (`@` becomes `%40`). `smtps://` connects on port 465 with TLS from the start; for port 587 use `smtp://user:password@host:587?tls=required`.
+
+Keep `ENCRYPTION_KEY` apart from the database and its backups: together they reveal every secret it protects. Replacing or losing it stops every authenticator app set up so far from working, and those users have to sign in with a recovery code and set two-step verification up again.
 
 ## Accounts
 
