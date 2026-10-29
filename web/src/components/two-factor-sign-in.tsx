@@ -52,7 +52,6 @@ interface TwoFactorSignInProps {
   onCancel: () => void
 }
 
-/** The second step of signing in, once the password checked out. */
 export function TwoFactorSignIn({
   onSignedIn,
   onEnded,
