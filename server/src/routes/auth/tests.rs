@@ -19,6 +19,7 @@ use crate::{
     },
     db,
     email::Mailer,
+    rate_limit::RateLimits,
     state::AppState,
 };
 
@@ -66,6 +67,7 @@ impl TestApp {
             pool: pool.clone(),
             mailer: Mailer::Log,
             app_url: Arc::new(Url::parse(app_url).unwrap()),
+            rate_limits: RateLimits::default(),
         };
         let (router, _) = crate::router();
 

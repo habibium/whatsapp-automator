@@ -9,7 +9,7 @@ use axum::{
     http::{HeaderValue, header},
     response::Response,
 };
-use server::{ClientIpHeader, config::Config, email::Mailer, state::AppState};
+use server::{ClientIpHeader, RateLimits, config::Config, email::Mailer, state::AppState};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_http::{
@@ -53,6 +53,7 @@ async fn main() -> anyhow::Result<()> {
         pool,
         mailer,
         app_url: Arc::new(config.app_url),
+        rate_limits: RateLimits::default(),
     };
 
     let (router, api) = server::router();

@@ -86,7 +86,10 @@ pub async fn signin(
     jar: CookieJar,
     ValidatedJson(payload): ValidatedJson<SignInCredentials>,
 ) -> Result<(CookieJar, Json<UserResponse>), AppError> {
-    let account = db::users::find_with_password(&state.pool, &normalize(&payload.email)).await?;
+    let email = normalize(&payload.email);
+    // Ahead of the lookup and Argon2, so a refused guess costs next to nothing
+    state.rate_limits.signin(&email)?;
+    let account = db::users::find_with_password(&state.pool, &email).await?;
     let stored_hash = account.as_ref().map(|(_, hash)| hash.clone());
     if !password::verify(payload.password, stored_hash).await? {
         return Err(AppError::InvalidCredentials);

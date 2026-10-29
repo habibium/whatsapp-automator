@@ -1,6 +1,7 @@
 use std::{
     hash::Hash,
     net::{IpAddr, Ipv6Addr, SocketAddr},
+    num::NonZeroU32,
     sync::Arc,
     time::Duration,
 };
@@ -11,7 +12,9 @@ use axum::{
     http::{HeaderName, Method, Request, Response},
     response::IntoResponse,
 };
-use governor::{DefaultKeyedRateLimiter, middleware::NoOpMiddleware};
+use governor::{
+    DefaultKeyedRateLimiter, Quota, RateLimiter, clock::Clock, middleware::NoOpMiddleware,
+};
 use tower_governor::{
     GovernorError, GovernorLayer, governor::GovernorConfigBuilder, key_extractor::KeyExtractor,
 };
@@ -19,6 +22,8 @@ use tower_governor::{
 use crate::error::AppError;
 
 const SWEEP_EVERY: Duration = Duration::from_mins(10);
+const ACCOUNT_BURST: NonZeroU32 = NonZeroU32::new(10).unwrap();
+const ACCOUNT_REFILL: Duration = Duration::from_secs(90);
 
 /// Limits writes per client IP to a burst of 20, then one every 6 seconds (10 a minute). Reads
 /// pass untouched: route guards poll the session on every page load.
@@ -96,6 +101,46 @@ fn key(ip: IpAddr) -> IpAddr {
         IpAddr::V6(ip) => IpAddr::V6(Ipv6Addr::from_bits(ip.to_bits() & !u128::from(u64::MAX))),
         ip @ IpAddr::V4(_) => ip,
     }
+}
+
+/// Attempts per account, however many addresses they come from: 10, then one every 90 seconds.
+///
+/// Anyone can spend an account's quota and so lock its owner out of password sign-in for up to 15
+/// minutes, which is why it stays generous.
+#[derive(Clone)]
+pub struct RateLimits {
+    signin: Arc<DefaultKeyedRateLimiter<String>>,
+}
+
+impl Default for RateLimits {
+    /// Also starts sweeping the limiters in the background
+    fn default() -> Self {
+        let quota = Quota::with_period(ACCOUNT_REFILL)
+            .expect("refill period is nonzero")
+            .allow_burst(ACCOUNT_BURST);
+        let limits = Self {
+            signin: Arc::new(RateLimiter::keyed(quota)),
+        };
+        sweep(&limits.signin);
+
+        limits
+    }
+}
+
+impl RateLimits {
+    /// Counts a sign-in attempt for `email`, already normalized
+    pub(crate) fn signin(&self, email: &str) -> Result<(), AppError> {
+        check(&self.signin, &email.to_owned())
+    }
+}
+
+fn check<K>(limiter: &DefaultKeyedRateLimiter<K>, key: &K) -> Result<(), AppError>
+where
+    K: Hash + Eq + Clone,
+{
+    limiter
+        .check_key(key)
+        .map_err(|refused| AppError::TooManyRequests(refused.wait_time_from(limiter.clock().now())))
 }
 
 /// Drops keys whose quota has refilled, which the limiter would treat as new anyway. Holds the

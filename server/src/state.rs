@@ -3,13 +3,14 @@ use std::sync::Arc;
 use sqlx::PgPool;
 use url::Url;
 
-use crate::email::Mailer;
+use crate::{email::Mailer, rate_limit::RateLimits};
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
     pub mailer: Mailer,
     pub app_url: Arc<Url>,
+    pub rate_limits: RateLimits,
 }
 
 impl AppState {
