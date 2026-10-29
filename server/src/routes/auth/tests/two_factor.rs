@@ -258,6 +258,52 @@ async fn a_setup_waits_15_minutes_for_its_first_code(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn five_wrong_codes_end_the_setup(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let (user_id, session) = app.signed_in(EMAIL).await;
+    let totp = app.set_up(&session).await;
+    let wrong = json!({ "code": wrong_code(&totp) });
+
+    for _ in 0..4 {
+        let attempt = app
+            .post("/two-factor/enable", wrong.clone(), Some(&session))
+            .await;
+        assert_eq!(attempt.status, StatusCode::BAD_REQUEST);
+        assert!(attempt.body["details"]["code"].is_array());
+    }
+    let fifth = app.post("/two-factor/enable", wrong, Some(&session)).await;
+    assert_eq!(fifth.status, StatusCode::CONFLICT);
+
+    let keys = "SELECT count(*) FROM totp_secrets WHERE user_id = $1";
+    assert_eq!(app.count(keys, user_id).await, 0);
+    let right = app
+        .post(
+            "/two-factor/enable",
+            json!({ "code": code(&totp, current_step()) }),
+            Some(&session),
+        )
+        .await;
+    assert_eq!(right.status, StatusCode::CONFLICT);
+
+    // A new key starts its own count, but the account has used up its codes for now
+    let totp = app.set_up(&session).await;
+    let fresh = "SELECT count(*) FROM totp_secrets WHERE user_id = $1 AND setup_attempts = 0";
+    assert_eq!(app.count(fresh, user_id).await, 1);
+    let limited = app
+        .post(
+            "/two-factor/enable",
+            json!({ "code": code(&totp, current_step()) }),
+            Some(&session),
+        )
+        .await;
+    assert_eq!(limited.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        app.get("/two-factor", &session).await.body["enabled"],
+        false
+    );
+}
+
+#[sqlx::test]
 async fn turning_on_signs_out_every_other_session(pool: PgPool) {
     let app = TestApp::new(pool);
     let (user_id, here) = app.signed_in(EMAIL).await;
