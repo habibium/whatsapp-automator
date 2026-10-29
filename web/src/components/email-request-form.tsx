@@ -8,12 +8,21 @@ import { z } from 'zod'
 
 import { EmailField } from '@/components/email-field'
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 
 const schema = z.object({
   email: z.string().trim().pipe(z.email('Enter a valid email address')),
 })
 
 const fieldNames = ['email'] as const
+
+type Problem =
+  | { kind: 'rate-limited'; retryAfter?: number }
+  | { kind: 'failed' }
 
 interface EmailRequestFormProps {
   defaultEmail?: string
@@ -30,7 +39,7 @@ export function EmailRequestForm({
   request,
   onSent,
 }: EmailRequestFormProps) {
-  const [isFailed, setIsFailed] = useState(false)
+  const [problem, setProblem] = useState<Problem | null>(null)
 
   const form = useForm({
     defaultValues: { email: defaultEmail },
@@ -38,7 +47,7 @@ export function EmailRequestForm({
     // Otherwise handleSubmit silently no-ops on an invalid form instead of surfacing the errors.
     canSubmitWhenInvalid: true,
     listeners: {
-      onChange: () => setIsFailed(false),
+      onChange: () => setProblem(null),
     },
     onSubmit: async ({ value, formApi }) => {
       const email = value.email.trim()
@@ -49,10 +58,18 @@ export function EmailRequestForm({
           return
         }
         const fields = toFieldErrors(error, fieldNames)
-        if (fields) formApi.setErrorMap({ onSubmit: { fields } })
-        else setIsFailed(true)
+        if (fields) {
+          formApi.setErrorMap({ onSubmit: { fields } })
+        } else if (response.status === 429) {
+          setProblem({
+            kind: 'rate-limited',
+            retryAfter: retryAfterSeconds(response),
+          })
+        } else {
+          setProblem({ kind: 'failed' })
+        }
       } catch {
-        setIsFailed(true)
+        setProblem({ kind: 'failed' })
       }
     },
   })
@@ -66,7 +83,13 @@ export function EmailRequestForm({
       }}
     >
       <VStack gap={6}>
-        {isFailed ? (
+        {problem?.kind === 'rate-limited' ? (
+          <Banner
+            status="error"
+            title={TOO_MANY_ATTEMPTS}
+            description={tryAgainIn(problem.retryAfter)}
+          />
+        ) : problem ? (
           <Banner
             status="error"
             title="Couldn't send the email."
