@@ -59,16 +59,20 @@ pub enum SecurityEvent {
     TooManyWrongCodes,
 }
 
+const RESET_NOW: &str =
+    "If this wasn't you, reset your password now, which signs out every device.";
+
 /// # Errors
 /// `app_url` cannot be a base for links.
 pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Email> {
-    let (subject, heading, what) = match event {
+    let (subject, heading, what, remedy) = match event {
         SecurityEvent::PasswordChanged => (
             "Your password was changed",
             "Your password was changed.",
             format!(
                 "The password for your {PRODUCT_NAME} account was changed, and every device was signed out."
             ),
+            RESET_NOW,
         ),
         SecurityEvent::TwoFactorEnabled => (
             "Two-step verification is on",
@@ -76,6 +80,7 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
             format!(
                 "Signing in to your {PRODUCT_NAME} account now also asks for a code from an authenticator app."
             ),
+            "If this wasn't you, reset your password now, which signs out every device. If two-step verification then keeps you out, ask whoever runs this service to turn it off for you.",
         ),
         SecurityEvent::TwoFactorDisabled => (
             "Two-step verification is off",
@@ -83,6 +88,7 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
             format!(
                 "Signing in to your {PRODUCT_NAME} account no longer asks for a code from an authenticator app."
             ),
+            RESET_NOW,
         ),
         SecurityEvent::RecoveryCodesRegenerated => (
             "New recovery codes were created",
@@ -90,18 +96,19 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
             format!(
                 "Your {PRODUCT_NAME} account has a new set of recovery codes, and the old ones stopped working."
             ),
+            "If this wasn't you, reset your password now, which signs out every device, then create new recovery codes.",
         ),
         SecurityEvent::PasskeyAdded => (
             "A passkey was added to your account",
             "A passkey was added.",
-            format!(
-                "A new passkey can now sign in to your {PRODUCT_NAME} account. If it wasn't you, also remove it in your security settings once you're back in."
-            ),
+            format!("A new passkey can now sign in to your {PRODUCT_NAME} account."),
+            "If this wasn't you, remove it in your security settings first, since it keeps working after a password reset, then reset your password.",
         ),
         SecurityEvent::PasskeyRemoved => (
             "A passkey was removed from your account",
             "A passkey was removed.",
             format!("A passkey can no longer sign in to your {PRODUCT_NAME} account."),
+            RESET_NOW,
         ),
         SecurityEvent::TooManyWrongCodes => (
             "Someone entered your password",
@@ -109,6 +116,7 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
             format!(
                 "Someone signed in to your {PRODUCT_NAME} account with the right password, then got the two-step verification code wrong too many times, so the sign-in was stopped."
             ),
+            "If this wasn't you, someone else knows your password: reset it now, which signs out every device.",
         ),
     };
     let link = app_url
@@ -118,9 +126,7 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
     Ok(render(&Layout {
         subject,
         heading,
-        body: format!(
-            "{what} If this wasn't you, reset your password now, which signs out every device."
-        ),
+        body: format!("{what} {remedy}"),
         action: "Reset your password",
         link: &link,
         footer: "If it was you, there's nothing else to do.",
