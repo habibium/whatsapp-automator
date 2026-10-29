@@ -20,6 +20,11 @@ pub enum AppError {
     #[error("Verify your email address before signing in")]
     EmailNotVerified,
 
+    /// The signed-in user's password, asked again before a sensitive change, did not match
+    #[expect(dead_code, reason = "constructed by `auth::reauth`, which has no caller yet")]
+    #[error("Validation Failed")]
+    IncorrectPassword,
+
     #[error("This link is invalid or has expired")]
     InvalidToken,
 
@@ -84,6 +89,15 @@ impl IntoResponse for AppError {
                     Some(details),
                 )
             }
+
+            Self::IncorrectPassword => (
+                StatusCode::BAD_REQUEST,
+                self.to_string(),
+                Some(HashMap::from([(
+                    "password".into(),
+                    vec!["is incorrect".into()],
+                )])),
+            ),
 
             Self::Conflict(_) => (StatusCode::CONFLICT, self.to_string(), None),
 

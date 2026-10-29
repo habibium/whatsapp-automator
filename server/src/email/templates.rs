@@ -1,3 +1,4 @@
+use anyhow::Context;
 use chrono::TimeDelta;
 use url::Url;
 
@@ -42,6 +43,80 @@ pub fn reset_password(link: &Url) -> Email {
         link,
         footer: "If it wasn't you, ignore this email and your password stays the same.",
     })
+}
+
+/// An account change the owner should hear about; the email offers the remedy for one they did not
+/// make
+#[expect(dead_code, reason = "two-step verification and passkeys send the rest")]
+#[derive(Clone, Copy)]
+pub enum SecurityEvent {
+    PasswordChanged,
+    TwoFactorEnabled,
+    TwoFactorDisabled,
+    RecoveryCodesRegenerated,
+    PasskeyAdded,
+    PasskeyRemoved,
+}
+
+/// # Errors
+/// `app_url` cannot be a base for links.
+pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Email> {
+    let (subject, heading, what) = match event {
+        SecurityEvent::PasswordChanged => (
+            "Your password was changed",
+            "Your password was changed.",
+            format!(
+                "The password for your {PRODUCT_NAME} account was changed, and every device was signed out."
+            ),
+        ),
+        SecurityEvent::TwoFactorEnabled => (
+            "Two-step verification is on",
+            "Two-step verification is on.",
+            format!(
+                "Signing in to your {PRODUCT_NAME} account now also asks for a code from an authenticator app."
+            ),
+        ),
+        SecurityEvent::TwoFactorDisabled => (
+            "Two-step verification is off",
+            "Two-step verification is off.",
+            format!(
+                "Signing in to your {PRODUCT_NAME} account no longer asks for a code from an authenticator app."
+            ),
+        ),
+        SecurityEvent::RecoveryCodesRegenerated => (
+            "New recovery codes were created",
+            "New recovery codes were created.",
+            format!(
+                "Your {PRODUCT_NAME} account has a new set of recovery codes, and the old ones stopped working."
+            ),
+        ),
+        SecurityEvent::PasskeyAdded => (
+            "A passkey was added to your account",
+            "A passkey was added.",
+            format!(
+                "A new passkey can now sign in to your {PRODUCT_NAME} account. If it wasn't you, also remove it in your security settings once you're back in."
+            ),
+        ),
+        SecurityEvent::PasskeyRemoved => (
+            "A passkey was removed from your account",
+            "A passkey was removed.",
+            format!("A passkey can no longer sign in to your {PRODUCT_NAME} account."),
+        ),
+    };
+    let link = app_url
+        .join("/forgot-password")
+        .context("APP_URL cannot be a base for links")?;
+
+    Ok(render(&Layout {
+        subject,
+        heading,
+        body: format!(
+            "{what} If this wasn't you, reset your password now, which signs out every device."
+        ),
+        action: "Reset your password",
+        link: &link,
+        footer: "If it was you, there's nothing else to do.",
+    }))
 }
 
 struct Layout<'a> {
@@ -140,7 +215,7 @@ fn escape(text: &str) -> String {
 mod tests {
     use url::Url;
 
-    use super::{escape, reset_password, verify_email};
+    use super::{SecurityEvent, escape, reset_password, security_alert, verify_email};
 
     #[test]
     fn escapes_markup() {
@@ -170,5 +245,13 @@ mod tests {
 
         assert!(verify_email(&link).text.contains("expires in 24 hours"));
         assert!(reset_password(&link).text.contains("expires in an hour"));
+    }
+
+    #[test]
+    fn security_alert_links_to_a_password_reset() {
+        let app_url = Url::parse("https://example.com/").unwrap();
+        let email = security_alert(SecurityEvent::TwoFactorDisabled, &app_url).unwrap();
+
+        assert!(email.text.contains("https://example.com/forgot-password"));
     }
 }

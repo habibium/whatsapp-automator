@@ -22,7 +22,7 @@ use crate::{
         token::{self, Purpose, Token},
     },
     db::{self, users::User},
-    email::templates,
+    email::templates::{self, SecurityEvent},
     error::{AppError, ErrorBody},
     extract::ValidatedJson,
 };
@@ -259,6 +259,9 @@ pub async fn reset_password(
     db::sessions::delete_for_user(&mut *tx, user.id).await?;
     db::tokens::delete_all_for_user(&mut *tx, user.id).await?;
     tx.commit().await?;
+
+    let alert = templates::security_alert(SecurityEvent::PasswordChanged, &state.app_url)?;
+    state.mailer.send_in_background(user.email.clone(), alert);
 
     Ok(Json(user.into()))
 }

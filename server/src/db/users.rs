@@ -74,6 +74,12 @@ pub async fn lock(db: impl PgExecutor<'_>, id: Uuid) -> sqlx::Result<()> {
     Ok(())
 }
 
+pub async fn password_hash(db: impl PgExecutor<'_>, id: Uuid) -> sqlx::Result<String> {
+    sqlx::query_scalar!("SELECT password FROM users WHERE id = $1", id)
+        .fetch_one(db)
+        .await
+}
+
 pub async fn signup_binding(db: impl PgExecutor<'_>, id: Uuid) -> sqlx::Result<Option<Vec<u8>>> {
     sqlx::query_scalar!("SELECT signup_binding_hash FROM users WHERE id = $1", id)
         .fetch_one(db)
