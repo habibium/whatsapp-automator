@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM totp_secrets WHERE enabled_at IS NULL AND created_at <= $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aeb94b4440a992b6300774400665f798fcb15bfb3e9ca06aa68049c68c8e1cbc"
+}

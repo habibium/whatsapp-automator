@@ -264,6 +264,18 @@ pub async fn delete_expired_challenges(db: impl PgExecutor<'_>) -> sqlx::Result<
     Ok(result.rows_affected())
 }
 
+/// Deletes setups started `ttl` ago or longer that no code confirmed
+pub async fn delete_expired_setups(db: impl PgExecutor<'_>, ttl: TimeDelta) -> sqlx::Result<u64> {
+    let result = sqlx::query!(
+        "DELETE FROM totp_secrets WHERE enabled_at IS NULL AND created_at <= $1",
+        Utc::now() - ttl
+    )
+    .execute(db)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 pub async fn delete_challenge(db: impl PgExecutor<'_>, token_hash: &[u8]) -> sqlx::Result<()> {
     sqlx::query!(
         "DELETE FROM two_factor_challenges WHERE token_hash = $1",
