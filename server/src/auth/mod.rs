@@ -1,4 +1,5 @@
 pub mod cookie;
+pub mod passkey;
 pub mod password;
 pub mod reauth;
 pub mod session;

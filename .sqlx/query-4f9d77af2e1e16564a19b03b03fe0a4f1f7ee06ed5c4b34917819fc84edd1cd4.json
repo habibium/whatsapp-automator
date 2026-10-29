@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM passkey_ceremonies WHERE expires_at <= now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "4f9d77af2e1e16564a19b03b03fe0a4f1f7ee06ed5c4b34917819fc84edd1cd4"
+}

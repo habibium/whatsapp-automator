@@ -25,6 +25,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/passkeys/registration/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish adding a passkey
+         * @description Verifies the credential `navigator.credentials.create()` made against the challenge from the
+         *     start, saves it and emails the owner. A challenge works once.
+         */
+        post: operations["finish_registration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/passkeys/registration/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start adding a passkey
+         * @description Checks the password again and returns the options for `navigator.credentials.create()`. The
+         *     challenge stays on the server for five minutes, named by a cookie.
+         */
+        post: operations["start_registration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/resend-verification": {
         parameters: {
             query?: never;
@@ -193,6 +235,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The account password, asked again before a passkey is added or removed */
+        ConfirmPasskeyChange: {
+            password: string;
+        };
         Credentials: {
             email: string;
             password: string;
@@ -219,6 +265,33 @@ export interface components {
             status: string;
             /** @description Lets a deploy tell when the new release is the one answering */
             version: string;
+        };
+        NewPasskey: {
+            /** @description `toJSON()` of the credential `navigator.credentials.create()` made */
+            credential: {
+                [key: string]: unknown;
+            };
+            /** @description Tells the user's passkeys apart; blank or left out, it is "Passkey" */
+            name?: string | null;
+        };
+        /** @description Options for `navigator.credentials.create()` */
+        PasskeyCreationOptions: {
+            /** @description For `PublicKeyCredential.parseCreationOptionsFromJSON` */
+            publicKey: {
+                [key: string]: unknown;
+            };
+        };
+        PasskeyResponse: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: date-time
+             * @description `null` until the passkey first signs in
+             */
+            last_used_at: string | null;
+            name: string;
         };
         PasswordReset: {
             password: string;
@@ -272,6 +345,122 @@ export interface operations {
                 content?: never;
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    finish_registration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPasskey"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyResponse"];
+                };
+            };
+            /** @description The credential failed verification, or the registration expired or already finished */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The passkey is already registered */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    start_registration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmPasskeyChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description Names this registration */
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyCreationOptions"];
+                };
+            };
+            /** @description Wrong password */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The account has as many passkeys as it may hold */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

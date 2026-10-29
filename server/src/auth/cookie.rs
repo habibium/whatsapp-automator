@@ -1,7 +1,7 @@
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use chrono::TimeDelta;
 
-use super::{session, token::Purpose};
+use super::{passkey, session, token::Purpose};
 
 /// An `HttpOnly`, `SameSite=Lax` cookie on `/`. Over https it is also `Secure` and takes the
 /// `__Host-` prefix, so no other subdomain can plant one; plain-http development cannot meet that
@@ -23,6 +23,13 @@ pub const SIGNUP: AuthCookie = AuthCookie {
     name: "signup",
     secure_name: "__Host-signup",
     max_age: Purpose::VerifyEmail.ttl(),
+};
+
+/// Names the passkey registration or sign-in this browser has under way
+pub const PASSKEY_CEREMONY: AuthCookie = AuthCookie {
+    name: "passkey_ceremony",
+    secure_name: "__Host-passkey_ceremony",
+    max_age: passkey::TTL,
 };
 
 impl AuthCookie {

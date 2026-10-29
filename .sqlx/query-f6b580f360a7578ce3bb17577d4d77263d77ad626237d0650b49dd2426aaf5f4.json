@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM passkey_ceremonies\n        WHERE token_hash = $1 AND kind = $2 AND user_id IS NOT DISTINCT FROM $3\n            AND expires_at > now()\n        RETURNING state AS \"state: Json<T>\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state: Json<T>",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "passkey_ceremonies",
+            "name": "state"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f6b580f360a7578ce3bb17577d4d77263d77ad626237d0650b49dd2426aaf5f4"
+}
