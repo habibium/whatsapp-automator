@@ -14,10 +14,26 @@ import {
   toPasskeyFailure,
 } from '@/lib/passkey'
 import type { WebAuthnJSON } from '@/lib/passkey'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 import type { User } from '@/lib/session'
 
-type Problem = 'not-accepted' | 'unverified' | 'unexpected'
+type RateLimited = { kind: 'rate-limited'; retryAfter?: number }
+type Problem = 'not-accepted' | 'unverified' | 'unexpected' | RateLimited
 type Outcome = 'signed-in' | 'cancelled' | Problem
+
+class RateLimitedError extends Error {
+  constructor(readonly problem: RateLimited) {
+    super(TOO_MANY_ATTEMPTS)
+  }
+}
+
+function rateLimited(response: Response): RateLimited {
+  return { kind: 'rate-limited', retryAfter: retryAfterSeconds(response) }
+}
 
 // The server keeps a challenge for five minutes; an older one is fetched again.
 const CHALLENGE_REUSE_MS = 4 * 60_000
@@ -54,7 +70,10 @@ function PasskeySignInButton({ onSignedIn }: PasskeySignInProps) {
     }
     const publicKey = api
       .POST('/api/auth/passkeys/signin/start')
-      .then(({ data }) => {
+      .then(({ data, response }) => {
+        if (response.status === 429) {
+          throw new RateLimitedError(rateLimited(response))
+        }
         if (!data) throw new Error('Could not start a passkey sign-in')
         return data.publicKey
       })
@@ -70,9 +89,15 @@ function PasskeySignInButton({ onSignedIn }: PasskeySignInProps) {
       mediation: CredentialMediationRequirement,
       signal?: AbortSignal,
     ): Promise<Outcome> => {
+      let publicKey: WebAuthnJSON
+      try {
+        publicKey = await prepare()
+      } catch (error) {
+        return error instanceof RateLimitedError ? error.problem : 'unexpected'
+      }
       let credential: WebAuthnJSON
       try {
-        credential = await getPasskey(await prepare(), mediation, signal)
+        credential = await getPasskey(publicKey, mediation, signal)
       } catch (error) {
         return toPasskeyFailure(error) === 'cancelled'
           ? 'cancelled'
@@ -91,6 +116,7 @@ function PasskeySignInButton({ onSignedIn }: PasskeySignInProps) {
         }
         if (response.status === 401) return 'not-accepted'
         if (response.status === 403) return 'unverified'
+        if (response.status === 429) return rateLimited(response)
         return 'unexpected'
       } catch {
         return 'unexpected'
@@ -144,6 +170,15 @@ function PasskeySignInButton({ onSignedIn }: PasskeySignInProps) {
 }
 
 function ProblemBanner({ problem }: { problem: Problem }) {
+  if (typeof problem === 'object') {
+    return (
+      <Banner
+        status="error"
+        title={TOO_MANY_ATTEMPTS}
+        description={tryAgainIn(problem.retryAfter)}
+      />
+    )
+  }
   switch (problem) {
     case 'not-accepted':
       return (

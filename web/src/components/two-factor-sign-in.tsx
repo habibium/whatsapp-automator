@@ -19,10 +19,16 @@ import {
   TwoFactorCodeField,
 } from '@/components/two-factor-code-field'
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 
 type SecondFactor = components['schemas']['SecondFactor']
 
-type Outcome = 'signed-in' | 'incorrect' | 'ended' | 'failed'
+type Problem = 'failed' | { kind: 'rate-limited'; retryAfter?: number }
+type Outcome = 'signed-in' | 'incorrect' | 'ended' | Problem
 
 const codeSchema = z.object({
   code: z.string().regex(/^\d{6}$/, `Enter the ${CODE_LENGTH}-digit code`),
@@ -73,6 +79,12 @@ export function TwoFactorSignIn({
         onEnded()
         return 'ended'
       }
+      if (response.status === 429) {
+        return {
+          kind: 'rate-limited',
+          retryAfter: retryAfterSeconds(response),
+        }
+      }
       return toFieldErrors(error, ['code', 'recovery_code'] as const)
         ? 'incorrect'
         : 'failed'
@@ -104,14 +116,14 @@ interface MethodFormProps {
 }
 
 function AppCodeForm({ verify, onSwitch }: MethodFormProps) {
-  const [hasFailed, setHasFailed] = useState(false)
+  const [problem, setProblem] = useState<Problem | null>(null)
 
   const form = useForm({
     defaultValues: { code: '' },
     validators: { onSubmit: codeSchema },
     canSubmitWhenInvalid: true,
     listeners: {
-      onChange: () => setHasFailed(false),
+      onChange: () => setProblem(null),
     },
     onSubmit: async ({ value, formApi }) => {
       const outcome = await verify({ code: value.code })
@@ -123,8 +135,8 @@ function AppCodeForm({ verify, onSwitch }: MethodFormProps) {
             },
           },
         })
-      } else if (outcome === 'failed') {
-        setHasFailed(true)
+      } else if (outcome !== 'signed-in' && outcome !== 'ended') {
+        setProblem(outcome)
       }
     },
   })
@@ -132,7 +144,7 @@ function AppCodeForm({ verify, onSwitch }: MethodFormProps) {
   return (
     <MethodForm
       onSubmit={() => form.handleSubmit()}
-      hasFailed={hasFailed}
+      problem={problem}
       switchLabel="Use a recovery code instead"
       onSwitch={onSwitch}
       submit={
@@ -166,14 +178,14 @@ function AppCodeForm({ verify, onSwitch }: MethodFormProps) {
 }
 
 function RecoveryCodeForm({ verify, onSwitch }: MethodFormProps) {
-  const [hasFailed, setHasFailed] = useState(false)
+  const [problem, setProblem] = useState<Problem | null>(null)
 
   const form = useForm({
     defaultValues: { recovery_code: '' },
     validators: { onSubmit: recoverySchema },
     canSubmitWhenInvalid: true,
     listeners: {
-      onChange: () => setHasFailed(false),
+      onChange: () => setProblem(null),
     },
     onSubmit: async ({ value, formApi }) => {
       const outcome = await verify({
@@ -189,8 +201,8 @@ function RecoveryCodeForm({ verify, onSwitch }: MethodFormProps) {
             },
           },
         })
-      } else if (outcome === 'failed') {
-        setHasFailed(true)
+      } else if (outcome !== 'signed-in' && outcome !== 'ended') {
+        setProblem(outcome)
       }
     },
   })
@@ -198,7 +210,7 @@ function RecoveryCodeForm({ verify, onSwitch }: MethodFormProps) {
   return (
     <MethodForm
       onSubmit={() => form.handleSubmit()}
-      hasFailed={hasFailed}
+      problem={problem}
       switchLabel="Use the authenticator app instead"
       onSwitch={onSwitch}
       submit={
@@ -236,7 +248,7 @@ function RecoveryCodeForm({ verify, onSwitch }: MethodFormProps) {
 
 interface MethodFormLayoutProps {
   onSubmit: () => Promise<void>
-  hasFailed: boolean
+  problem: Problem | null
   switchLabel: string
   onSwitch: () => void
   submit: ReactNode
@@ -245,7 +257,7 @@ interface MethodFormLayoutProps {
 
 function MethodForm({
   onSubmit,
-  hasFailed,
+  problem,
   switchLabel,
   onSwitch,
   submit,
@@ -260,11 +272,17 @@ function MethodForm({
       }}
     >
       <VStack gap={6}>
-        {hasFailed ? (
+        {problem === 'failed' ? (
           <Banner
             status="error"
             title="Couldn't check that code."
             description="Something went wrong on our side. Try again in a moment."
+          />
+        ) : problem ? (
+          <Banner
+            status="error"
+            title={TOO_MANY_ATTEMPTS}
+            description={tryAgainIn(problem.retryAfter)}
           />
         ) : null}
 
