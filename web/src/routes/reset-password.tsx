@@ -12,6 +12,11 @@ import { api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
 import { PasswordField } from '@/components/password-field'
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 import { SIGNIN_HREF, setSessionUser } from '@/lib/session'
 import { stringParam } from '@/lib/search'
 
@@ -34,12 +39,16 @@ const resetSchema = z.object({
 
 const fieldNames = ['password'] as const
 
+type Problem =
+  | { kind: 'rate-limited'; retryAfter?: number }
+  | { kind: 'failed' }
+
 function ResetPassword() {
   const { token } = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [isExpired, setIsExpired] = useState(false)
-  const [isFailed, setIsFailed] = useState(false)
+  const [problem, setProblem] = useState<Problem | null>(null)
 
   const form = useForm({
     defaultValues: { password: '' },
@@ -47,7 +56,7 @@ function ResetPassword() {
     // Otherwise handleSubmit silently no-ops on an invalid form instead of surfacing the errors.
     canSubmitWhenInvalid: true,
     listeners: {
-      onChange: () => setIsFailed(false),
+      onChange: () => setProblem(null),
     },
     onSubmit: async ({ value, formApi }) => {
       if (!token) return
@@ -68,11 +77,20 @@ function ResetPassword() {
           return
         }
         const fields = toFieldErrors(error, fieldNames)
-        if (fields) formApi.setErrorMap({ onSubmit: { fields } })
-        else if (response.status === 400) setIsExpired(true)
-        else setIsFailed(true)
+        if (fields) {
+          formApi.setErrorMap({ onSubmit: { fields } })
+        } else if (response.status === 400) {
+          setIsExpired(true)
+        } else if (response.status === 429) {
+          setProblem({
+            kind: 'rate-limited',
+            retryAfter: retryAfterSeconds(response),
+          })
+        } else {
+          setProblem({ kind: 'failed' })
+        }
       } catch {
-        setIsFailed(true)
+        setProblem({ kind: 'failed' })
       }
     },
   })
@@ -115,7 +133,13 @@ function ResetPassword() {
         }}
       >
         <VStack gap={6}>
-          {isFailed ? (
+          {problem?.kind === 'rate-limited' ? (
+            <Banner
+              status="error"
+              title={TOO_MANY_ATTEMPTS}
+              description={tryAgainIn(problem.retryAfter)}
+            />
+          ) : problem ? (
             <Banner
               status="error"
               title="Couldn't change your password."
