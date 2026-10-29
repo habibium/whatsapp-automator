@@ -23,6 +23,11 @@ import type { Notice } from '@/lib/notice'
 
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
 import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
+import {
   SIGNUP_HREF,
   currentUser,
   safeRedirect,
@@ -53,6 +58,7 @@ const fieldNames = ['email', 'password'] as const
 type Problem =
   | { kind: 'credentials' }
   | { kind: 'unverified'; email: string; isResent: boolean }
+  | { kind: 'rate-limited'; retryAfter?: number }
   | { kind: 'unexpected' }
 
 function SignIn() {
@@ -86,6 +92,8 @@ function SignIn() {
           setProblem({ kind: 'credentials' })
         } else if (response.status === 403) {
           setProblem({ kind: 'unverified', email, isResent: false })
+        } else if (response.status === 429) {
+          setProblem(rateLimited(response))
         } else {
           const fields = toFieldErrors(error, fieldNames)
           if (fields) formApi.setErrorMap({ onSubmit: { fields } })
@@ -102,11 +110,13 @@ function SignIn() {
       const { response } = await api.POST('/api/auth/resend-verification', {
         body: { email },
       })
-      setProblem(
-        response.ok
-          ? { kind: 'unverified', email, isResent: true }
-          : { kind: 'unexpected' },
-      )
+      if (response.ok) {
+        setProblem({ kind: 'unverified', email, isResent: true })
+      } else if (response.status === 429) {
+        setProblem(rateLimited(response))
+      } else {
+        setProblem({ kind: 'unexpected' })
+      }
     } catch {
       setProblem({ kind: 'unexpected' })
     }
@@ -222,6 +232,10 @@ function SignIn() {
   )
 }
 
+function rateLimited(response: Response): Problem {
+  return { kind: 'rate-limited', retryAfter: retryAfterSeconds(response) }
+}
+
 function NoticeBanner({ notice }: { notice: Notice }) {
   return notice === 'email-verified' ? (
     <Banner
@@ -274,6 +288,14 @@ function ProblemBanner({ problem, onResend }: ProblemBannerProps) {
               clickAction={() => onResend(problem.email)}
             />
           }
+        />
+      )
+    case 'rate-limited':
+      return (
+        <Banner
+          status="error"
+          title={TOO_MANY_ATTEMPTS}
+          description={tryAgainIn(problem.retryAfter)}
         />
       )
     case 'unexpected':
