@@ -325,8 +325,9 @@ async fn an_authenticator_code_signs_in_once(pool: PgPool) {
 
 #[sqlx::test]
 async fn five_wrong_codes_end_the_sign_in(pool: PgPool) {
+    // Enrolled through another instance, whose in-memory limits do not count the enable code here
+    let enrolled = TestApp::new(pool.clone()).enroll(EMAIL).await;
     let app = TestApp::new(pool);
-    let enrolled = app.enroll(EMAIL).await;
     let challenge = app.challenge(EMAIL).await;
     let wrong = json!({ "code": wrong_code(&enrolled.totp) });
 
@@ -348,14 +349,15 @@ async fn five_wrong_codes_end_the_sign_in(pool: PgPool) {
         .await;
     assert_eq!(right.status, StatusCode::UNAUTHORIZED);
 
+    // Starting over from the password leaves the account's codes spent
     let fresh = app.challenge(EMAIL).await;
-    let signed_in = app
+    let refused = app
         .second_factor(
             json!({ "code": code(&enrolled.totp, enrolled.step + 1) }),
             &fresh,
         )
         .await;
-    assert_eq!(signed_in.status, StatusCode::OK);
+    assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
 }
 
 #[sqlx::test]

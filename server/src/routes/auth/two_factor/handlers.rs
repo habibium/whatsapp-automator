@@ -206,11 +206,13 @@ pub async fn regenerate_recovery_codes(
 ///
 /// Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
 /// the authenticator app or a recovery code. Each code works once. After five wrong codes the
-/// sign-in ends and has to start over from the password.
+/// sign-in ends and has to start over from the password. An account gets five codes checked, then
+/// one every 30 minutes, however many sign-ins they are spread over.
 #[utoipa::path(post, path = "/signin/two-factor", request_body = SecondFactor, responses(
     (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "The session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong or was used already", body = ErrorBody),
     (status = UNAUTHORIZED, description = "No sign-in is waiting: it expired, ran out of attempts or never started", body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client, or codes tried for this account", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn verify_two_factor(
@@ -228,6 +230,8 @@ pub async fn verify_two_factor(
     let owner = db::two_factor::find_challenge(&mut *tx, &token_hash)
         .await?
         .ok_or(AppError::SignInExpired)?;
+    // Per user rather than per challenge, since a new challenge costs only the password
+    state.rate_limits.second_factor(owner.id)?;
     // Attempts at this sign-in take turns. A password reset either commits first and takes the
     // challenge with it, hence the second read, or waits and then ends the session started here.
     db::users::lock(&mut *tx, owner.id).await?;

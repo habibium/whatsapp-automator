@@ -706,7 +706,7 @@
     "/api/auth/signin/two-factor": {
       "post": {
         "summary": "Finish signing in",
-        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password.",
+        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password. An account gets five codes checked, then\none every 30 minutes, however many sign-ins they are spread over.",
         "operationId": "verify_two_factor",
         "requestBody": {
           "content": {
@@ -749,6 +749,26 @@
           },
           "401": {
             "description": "No sign-in is waiting: it expired, ran out of attempts or never started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many writes from this client, or codes tried for this account",
+            "headers": {
+              "retry-after": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "description": "Seconds until another attempt is allowed"
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {

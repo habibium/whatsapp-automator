@@ -25,6 +25,8 @@ use crate::error::AppError;
 const SWEEP_EVERY: Duration = Duration::from_mins(10);
 const ACCOUNT_BURST: NonZeroU32 = NonZeroU32::new(10).unwrap();
 const ACCOUNT_REFILL: Duration = Duration::from_secs(90);
+const SECOND_FACTOR_BURST: NonZeroU32 = NonZeroU32::new(5).unwrap();
+const SECOND_FACTOR_REFILL: Duration = Duration::from_mins(30);
 
 /// Limits writes per client IP to a burst of 20, then one every 6 seconds (10 a minute). Reads
 /// pass untouched: route guards poll the session on every page load.
@@ -104,28 +106,37 @@ fn key(ip: IpAddr) -> IpAddr {
     }
 }
 
-/// Attempts per account, however many addresses they come from: 10, then one every 90 seconds.
+/// Attempts per account, however many addresses they come from.
 ///
-/// Anyone can spend an account's quota and so lock its owner out of password sign-in for up to 15
-/// minutes, which is why it stays generous.
+/// Passwords get 10, then one every 90 seconds. Anyone can spend an account's quota and so lock
+/// its owner out of password sign-in for up to 15 minutes, which is why it stays generous.
+///
+/// Second-factor codes get 5, then one every 30 minutes, about 50 a day. Only someone who has the
+/// password can spend those, and a 6-digit code does not survive thousands of guesses a day.
 #[derive(Clone)]
 pub struct RateLimits {
     signin: Arc<DefaultKeyedRateLimiter<String>>,
     reauth: Arc<DefaultKeyedRateLimiter<Uuid>>,
+    second_factor: Arc<DefaultKeyedRateLimiter<Uuid>>,
 }
 
 impl Default for RateLimits {
     /// Also starts sweeping the limiters in the background
     fn default() -> Self {
-        let quota = Quota::with_period(ACCOUNT_REFILL)
+        let account = Quota::with_period(ACCOUNT_REFILL)
             .expect("refill period is nonzero")
             .allow_burst(ACCOUNT_BURST);
+        let second_factor = Quota::with_period(SECOND_FACTOR_REFILL)
+            .expect("refill period is nonzero")
+            .allow_burst(SECOND_FACTOR_BURST);
         let limits = Self {
-            signin: Arc::new(RateLimiter::keyed(quota)),
-            reauth: Arc::new(RateLimiter::keyed(quota)),
+            signin: Arc::new(RateLimiter::keyed(account)),
+            reauth: Arc::new(RateLimiter::keyed(account)),
+            second_factor: Arc::new(RateLimiter::keyed(second_factor)),
         };
         sweep(&limits.signin);
         sweep(&limits.reauth);
+        sweep(&limits.second_factor);
 
         limits
     }
@@ -140,6 +151,11 @@ impl RateLimits {
     /// Counts a password re-check by the signed-in `user_id`
     pub(crate) fn reauth(&self, user_id: Uuid) -> Result<(), AppError> {
         check(&self.reauth, &user_id)
+    }
+
+    /// Counts a second-factor code checked for `user_id`, whichever sign-in or setup it is for
+    pub(crate) fn second_factor(&self, user_id: Uuid) -> Result<(), AppError> {
+        check(&self.second_factor, &user_id)
     }
 }
 

@@ -249,7 +249,8 @@ export interface paths {
          * Finish signing in
          * @description Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
          *     the authenticator app or a recovery code. Each code works once. After five wrong codes the
-         *     sign-in ends and has to start over from the password.
+         *     sign-in ends and has to start over from the password. An account gets five codes checked, then
+         *     one every 30 minutes, however many sign-ins they are spread over.
          */
         post: operations["verify_two_factor"];
         delete?: never;
@@ -1182,6 +1183,17 @@ export interface operations {
             /** @description No sign-in is waiting: it expired, ran out of attempts or never started */
             401: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many writes from this client, or codes tried for this account */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
                     [name: string]: unknown;
                 };
                 content: {
