@@ -229,7 +229,7 @@ pub async fn regenerate_recovery_codes(
 /// the authenticator app or a recovery code. Each code works once. After five wrong codes the
 /// sign-in ends and has to start over from the password, and the owner is emailed, at most once
 /// every 6 hours. An account gets five codes checked, then one every 30 minutes, however many
-/// sign-ins they are spread over.
+/// sign-ins they are spread over. A sign-in with a recovery code emails the owner too.
 #[utoipa::path(post, path = "/signin/two-factor", request_body = SecondFactor, responses(
     (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "The session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong or was used already", body = ErrorBody),
@@ -283,9 +283,24 @@ pub async fn verify_two_factor(
     }
 
     db::two_factor::delete_challenge(&mut *tx, &token_hash).await?;
+    let recovery_codes_left = if matches!(payload, SecondFactor::RecoveryCode(_)) {
+        Some(
+            db::two_factor::status(&mut *tx, user.id)
+                .await?
+                .recovery_codes_remaining,
+        )
+    } else {
+        None
+    };
     let jar = cookie::TWO_FACTOR.clear(jar, secure);
     let jar = session::start(&mut *tx, jar, user.id, secure).await?;
     tx.commit().await?;
+
+    // Unlike an app code, a recovery code works without the owner's phone
+    if let Some(remaining) = recovery_codes_left {
+        let event = SecurityEvent::RecoveryCodeUsed { remaining };
+        alert(&state, user.email.clone(), event)?;
+    }
 
     Ok((jar, Json(user.into())))
 }

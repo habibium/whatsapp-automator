@@ -57,10 +57,15 @@ pub enum SecurityEvent {
     PasskeyRemoved,
     /// A sign-in got the password right, then ran out of second-factor codes
     TooManyWrongCodes,
+    /// A sign-in finished with a recovery code, which leaves `remaining` unused
+    RecoveryCodeUsed {
+        remaining: i64,
+    },
 }
 
 const RESET_NOW: &str =
     "If this wasn't you, reset your password now, which signs out every device.";
+const RESET_THEN_NEW_CODES: &str = "If this wasn't you, reset your password now, which signs out every device, then create new recovery codes.";
 
 /// # Errors
 /// `app_url` cannot be a base for links.
@@ -96,7 +101,7 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
             format!(
                 "Your {PRODUCT_NAME} account has a new set of recovery codes, and the old ones stopped working."
             ),
-            "If this wasn't you, reset your password now, which signs out every device, then create new recovery codes.",
+            RESET_THEN_NEW_CODES,
         ),
         SecurityEvent::PasskeyAdded => (
             "A passkey was added to your account",
@@ -117,6 +122,15 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
                 "Someone signed in to your {PRODUCT_NAME} account with the right password, then got the two-step verification code wrong too many times, so the sign-in was stopped."
             ),
             "If this wasn't you, someone else knows your password: reset it now, which signs out every device.",
+        ),
+        SecurityEvent::RecoveryCodeUsed { remaining } => (
+            "A recovery code was used to sign in",
+            "A recovery code was used.",
+            format!(
+                "Someone signed in to your {PRODUCT_NAME} account with a recovery code instead of a code from the authenticator app. {}",
+                recovery_codes_left(remaining)
+            ),
+            RESET_THEN_NEW_CODES,
         ),
     };
     let (action, path) = if matches!(event, SecurityEvent::PasskeyAdded) {
@@ -204,6 +218,14 @@ fn render(layout: &Layout) -> Email {
         subject,
         text,
         html,
+    }
+}
+
+fn recovery_codes_left(remaining: i64) -> String {
+    match remaining {
+        0 => "No recovery codes are left.".into(),
+        1 => "1 recovery code is left.".into(),
+        remaining => format!("{remaining} recovery codes are left."),
     }
 }
 

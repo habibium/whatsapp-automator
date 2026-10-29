@@ -251,7 +251,7 @@ export interface paths {
          *     the authenticator app or a recovery code. Each code works once. After five wrong codes the
          *     sign-in ends and has to start over from the password, and the owner is emailed, at most once
          *     every 6 hours. An account gets five codes checked, then one every 30 minutes, however many
-         *     sign-ins they are spread over.
+         *     sign-ins they are spread over. A sign-in with a recovery code emails the owner too.
          */
         post: operations["verify_two_factor"];
         delete?: never;

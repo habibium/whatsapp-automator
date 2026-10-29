@@ -706,7 +706,7 @@
     "/api/auth/signin/two-factor": {
       "post": {
         "summary": "Finish signing in",
-        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password, and the owner is emailed, at most once\nevery 6 hours. An account gets five codes checked, then one every 30 minutes, however many\nsign-ins they are spread over.",
+        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password, and the owner is emailed, at most once\nevery 6 hours. An account gets five codes checked, then one every 30 minutes, however many\nsign-ins they are spread over. A sign-in with a recovery code emails the owner too.",
         "operationId": "verify_two_factor",
         "requestBody": {
           "content": {
