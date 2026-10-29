@@ -27,8 +27,18 @@ import {
   RecoveryCodes,
 } from '@/components/two-factor-recovery-codes'
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 
 type TwoFactorSetup = components['schemas']['TwoFactorSetup']
+
+type Problem =
+  | 'stale'
+  | 'failed'
+  | { kind: 'rate-limited'; retryAfter?: number }
 
 const QR_SIZE = 152
 
@@ -99,7 +109,7 @@ interface ScanStepProps {
 }
 
 function ScanStep({ setup, onEnabled, onCancel }: ScanStepProps) {
-  const [problem, setProblem] = useState<'stale' | 'failed' | null>(null)
+  const [problem, setProblem] = useState<Problem | null>(null)
   const { copy, isCopied } = useClipboard({ announce: 'Setup key copied' })
 
   const form = useForm({
@@ -129,6 +139,11 @@ function ScanStep({ setup, onEnabled, onCancel }: ScanStepProps) {
                 ],
               },
             },
+          })
+        } else if (response.status === 429) {
+          setProblem({
+            kind: 'rate-limited',
+            retryAfter: retryAfterSeconds(response),
           })
         } else {
           setProblem(response.status === 409 ? 'stale' : 'failed')
@@ -169,6 +184,12 @@ function ScanStep({ setup, onEnabled, onCancel }: ScanStepProps) {
                   status="error"
                   title="That didn't work."
                   description="Something went wrong on our side. Try again in a moment."
+                />
+              ) : problem ? (
+                <Banner
+                  status="error"
+                  title={TOO_MANY_ATTEMPTS}
+                  description={tryAgainIn(problem.retryAfter)}
                 />
               ) : null}
 
