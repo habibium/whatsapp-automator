@@ -119,15 +119,20 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
             "If this wasn't you, someone else knows your password: reset it now, which signs out every device.",
         ),
     };
+    let (action, path) = if matches!(event, SecurityEvent::PasskeyAdded) {
+        ("Review your passkeys", "/settings")
+    } else {
+        ("Reset your password", "/forgot-password")
+    };
     let link = app_url
-        .join("/forgot-password")
+        .join(path)
         .context("APP_URL cannot be a base for links")?;
 
     Ok(render(&Layout {
         subject,
         heading,
         body: format!("{what} {remedy}"),
-        action: "Reset your password",
+        action,
         link: &link,
         footer: "If it was you, there's nothing else to do.",
     }))
