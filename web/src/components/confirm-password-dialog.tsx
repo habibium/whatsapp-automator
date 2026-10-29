@@ -11,12 +11,23 @@ import { z } from 'zod'
 
 import { PasswordField } from '@/components/password-field'
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 
 const schema = z.object({
   password: z.string().min(1, 'Enter your password'),
 })
 
-export type ConfirmOutcome = 'confirmed' | 'incorrect-password' | 'failed'
+export type ConfirmOutcome =
+  | 'confirmed'
+  | 'incorrect-password'
+  | 'failed'
+  | { kind: 'rate-limited'; retryAfter?: number }
+
+type Problem = Exclude<ConfirmOutcome, 'confirmed' | 'incorrect-password'>
 
 /** Reads an openapi-fetch result from an endpoint that re-checks the password. */
 export function toConfirmOutcome(result: {
@@ -24,6 +35,12 @@ export function toConfirmOutcome(result: {
   error?: unknown
 }): ConfirmOutcome {
   if (result.response.ok) return 'confirmed'
+  if (result.response.status === 429) {
+    return {
+      kind: 'rate-limited',
+      retryAfter: retryAfterSeconds(result.response),
+    }
+  }
   return toFieldErrors(result.error, ['password'] as const)
     ? 'incorrect-password'
     : 'failed'
@@ -74,14 +91,14 @@ function ConfirmPasswordForm({
   onConfirm,
   onClose,
 }: ConfirmPasswordFormProps) {
-  const [hasFailed, setHasFailed] = useState(false)
+  const [problem, setProblem] = useState<Problem | null>(null)
 
   const form = useForm({
     defaultValues: { password: '' },
     validators: { onSubmit: schema },
     canSubmitWhenInvalid: true,
     listeners: {
-      onChange: () => setHasFailed(false),
+      onChange: () => setProblem(null),
     },
     onSubmit: async ({ value, formApi }) => {
       let outcome: ConfirmOutcome
@@ -99,7 +116,7 @@ function ConfirmPasswordForm({
           },
         })
       } else {
-        setHasFailed(true)
+        setProblem(outcome)
       }
     },
   })
@@ -123,11 +140,17 @@ function ConfirmPasswordForm({
         content={
           <LayoutContent>
             <VStack gap={4}>
-              {hasFailed ? (
+              {problem === 'failed' ? (
                 <Banner
                   status="error"
                   title="That didn't work."
                   description="Something went wrong on our side. Try again in a moment."
+                />
+              ) : problem ? (
+                <Banner
+                  status="error"
+                  title={TOO_MANY_ATTEMPTS}
+                  description={tryAgainIn(problem.retryAfter)}
                 />
               ) : null}
               <FormLayout defaultOptionality="required">
