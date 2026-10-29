@@ -285,22 +285,18 @@ async fn five_wrong_codes_end_the_setup(pool: PgPool) {
         .await;
     assert_eq!(right.status, StatusCode::CONFLICT);
 
-    // A new key starts its own count, but the account has used up its codes for now
+    // A new key starts its own count
     let totp = app.set_up(&session).await;
     let fresh = "SELECT count(*) FROM totp_secrets WHERE user_id = $1 AND setup_attempts = 0";
     assert_eq!(app.count(fresh, user_id).await, 1);
-    let limited = app
+    let enabled = app
         .post(
             "/two-factor/enable",
             json!({ "code": code(&totp, current_step()) }),
             Some(&session),
         )
         .await;
-    assert_eq!(limited.status, StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(
-        app.get("/two-factor", &session).await.body["enabled"],
-        false
-    );
+    assert_eq!(enabled.status, StatusCode::OK);
 }
 
 #[sqlx::test]
@@ -443,9 +439,8 @@ async fn an_authenticator_code_signs_in_once(pool: PgPool) {
 
 #[sqlx::test]
 async fn five_wrong_codes_end_the_sign_in(pool: PgPool) {
-    // Enrolled through another instance, whose in-memory limits do not count the enable code here
-    let enrolled = TestApp::new(pool.clone()).enroll(EMAIL).await;
     let app = TestApp::new(pool);
+    let enrolled = app.enroll(EMAIL).await;
     let challenge = app.challenge(EMAIL).await;
     let wrong = json!({ "code": wrong_code(&enrolled.totp) });
 
@@ -461,7 +456,13 @@ async fn five_wrong_codes_end_the_sign_in(pool: PgPool) {
         .into_iter()
         .map(|(subject, _)| subject)
         .collect();
-    assert_eq!(alerts, ["Someone entered your password"]);
+    assert_eq!(
+        alerts,
+        [
+            "Two-step verification is on",
+            "Someone entered your password"
+        ]
+    );
 
     let challenges = "SELECT count(*) FROM two_factor_challenges WHERE user_id = $1";
     assert_eq!(app.count(challenges, enrolled.user_id).await, 0);
@@ -473,55 +474,50 @@ async fn five_wrong_codes_end_the_sign_in(pool: PgPool) {
         .await;
     assert_eq!(right.status, StatusCode::UNAUTHORIZED);
 
-    // Starting over from the password leaves the account's codes spent
     let fresh = app.challenge(EMAIL).await;
-    let refused = app
+    let signed_in = app
         .second_factor(
             json!({ "code": code(&enrolled.totp, enrolled.step + 1) }),
             &fresh,
         )
         .await;
-    assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(signed_in.status, StatusCode::OK);
 }
 
 #[sqlx::test]
-async fn codes_are_limited_per_account_across_sign_ins(pool: PgPool) {
-    let enrolled = TestApp::new(pool.clone()).enroll(EMAIL).await;
+async fn wrong_codes_are_capped_per_account_across_sign_ins(pool: PgPool) {
     let app = TestApp::new(pool);
+    let enrolled = app.enroll(EMAIL).await;
     let grace = app.enroll("grace@example.com").await;
-    let wrong = json!({ "code": wrong_code(&enrolled.totp) });
+    // One short of the cap, as if spent over earlier sign-ins
+    let spent = two_factor::WRONG_CODE_LIMIT - 1;
+    sqlx::query(
+        "UPDATE totp_secrets SET wrong_codes = $2, wrong_codes_since = now() WHERE user_id = $1",
+    )
+    .bind(enrolled.user_id)
+    .bind(spent)
+    .execute(&app.pool)
+    .await
+    .unwrap();
 
-    // Five codes in all, none of them enough to end either sign-in
-    let (first, second) = (app.challenge(EMAIL).await, app.challenge(EMAIL).await);
-    for (challenge, times) in [(&first, 3), (&second, 2)] {
-        for _ in 0..times {
-            let attempt = app.second_factor(wrong.clone(), challenge).await;
-            assert_eq!(attempt.status, StatusCode::BAD_REQUEST);
-        }
-    }
+    let challenge = app.challenge(EMAIL).await;
+    let last = app
+        .second_factor(json!({ "code": wrong_code(&enrolled.totp) }), &challenge)
+        .await;
+    assert_eq!(last.status, StatusCode::BAD_REQUEST);
 
     for body in [
         json!({ "code": code(&enrolled.totp, enrolled.step + 1) }),
         json!({ "recovery_code": enrolled.recovery_codes[0] }),
     ] {
-        let refused = app.second_factor(body, &second).await;
+        let refused = app.second_factor(body, &challenge).await;
         assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(refused.body["error"], TOO_MANY);
-        // One code comes back every 30 minutes
-        assert!((1..=30 * 60).contains(&retry_after(&refused)));
+        assert!((1..=24 * 60 * 60).contains(&retry_after(&refused)));
     }
-    let refused = app.second_factor(wrong, &first).await;
-    assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
-
-    // Refused before any code was checked, so neither sign-in lost an attempt to them
-    let attempts: Vec<i16> = sqlx::query_scalar(
-        "SELECT attempts FROM two_factor_challenges WHERE user_id = $1 ORDER BY attempts",
-    )
-    .bind(enrolled.user_id)
-    .fetch_all(&app.pool)
-    .await
-    .unwrap();
-    assert_eq!(attempts, [2, 3]);
+    // Refused before any code was checked, so the sign-in lost no attempt to them
+    let attempts = "SELECT count(*) FROM two_factor_challenges WHERE user_id = $1 AND attempts = 1";
+    assert_eq!(app.count(attempts, enrolled.user_id).await, 1);
 
     let other_account = app
         .second_factor(
@@ -530,6 +526,40 @@ async fn codes_are_limited_per_account_across_sign_ins(pool: PgPool) {
         )
         .await;
     assert_eq!(other_account.status, StatusCode::OK);
+
+    // Once the day is over the count starts again, and a right code clears it
+    sqlx::query(
+        "UPDATE totp_secrets SET wrong_codes_since = now() - interval '1 day' WHERE user_id = $1",
+    )
+    .bind(enrolled.user_id)
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    let signed_in = app
+        .second_factor(
+            json!({ "code": code(&enrolled.totp, enrolled.step + 1) }),
+            &challenge,
+        )
+        .await;
+    assert_eq!(signed_in.status, StatusCode::OK);
+    let cleared = "SELECT count(*) FROM totp_secrets WHERE user_id = $1 AND wrong_codes = 0";
+    assert_eq!(app.count(cleared, enrolled.user_id).await, 1);
+}
+
+#[sqlx::test]
+async fn right_codes_do_not_count_toward_the_cap(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let enrolled = app.enroll(EMAIL).await;
+
+    for recovery_code in &enrolled.recovery_codes[..6] {
+        let signed_in = app
+            .second_factor(
+                json!({ "recovery_code": recovery_code }),
+                &app.challenge(EMAIL).await,
+            )
+            .await;
+        assert_eq!(signed_in.status, StatusCode::OK);
+    }
 }
 
 #[sqlx::test]
