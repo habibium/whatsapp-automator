@@ -44,17 +44,17 @@ To run the generation by hand: `just gen-api`.
 
 ## Commands
 
-| Recipe              | What it does                                                    |
-| ------------------- | --------------------------------------------------------------- |
-| `just dev`          | Start backend and frontend                                      |
-| `just check`        | Clippy, OpenAPI freshness, formatting, lint, TS types freshness |
-| `just fmt`          | Format Rust and TypeScript                                      |
-| `just gen-api`      | Regenerate `openapi.json` and `schema.d.ts`                     |
-| `just build`        | Production build: `web/dist` and the release binary             |
-| `just start`        | Run the release binary, serving the SPA and the API on one port |
-| `just docker-build` | Build the production image locally                              |
-| `just changelog`    | Preview the changelog entries since the last release            |
-| `just release`      | Tag a version and push; CI builds, publishes and deploys it     |
+| Recipe              | What it does                                                           |
+| ------------------- | ---------------------------------------------------------------------- |
+| `just dev`          | Start backend and frontend                                             |
+| `just check`        | Clippy, tests, OpenAPI freshness, formatting, lint, TS types freshness |
+| `just fmt`          | Format Rust and TypeScript                                             |
+| `just gen-api`      | Regenerate `openapi.json` and `schema.d.ts`                            |
+| `just build`        | Production build: `web/dist` and the release binary                    |
+| `just start`        | Run the release binary, serving the SPA and the API on one port        |
+| `just docker-build` | Build the production image locally                                     |
+| `just changelog`    | Preview the changelog entries since the last release                   |
+| `just release`      | Tag a version and push; CI builds, publishes and deploys it            |
 
 Run `just` alone to list recipes.
 
@@ -62,11 +62,20 @@ Run `just` alone to list recipes.
 
 Environment variables, or a `.env` file in development (see `.env.example`):
 
-| Variable       | Default               | Purpose                                 |
-| -------------- | --------------------- | --------------------------------------- |
-| `DATABASE_URL` | required              | Postgres connection string              |
-| `PORT`         | `8000`                | Listen port                             |
-| `WEB_DIR`      | `web/dist`            | Built SPA to serve for non-`/api` paths |
-| `RUST_LOG`     | `info,server=debug,…` | tracing filter                          |
+| Variable       | Default                                                             | Purpose                                                                                          |
+| -------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL` | required                                                            | Postgres connection string                                                                       |
+| `PORT`         | `8000`                                                              | Listen port                                                                                      |
+| `WEB_DIR`      | `web/dist`                                                          | Built SPA to serve for non-`/api` paths                                                          |
+| `RUST_LOG`     | `info,server=debug,…`                                               | tracing filter                                                                                   |
+| `APP_URL`      | required in release builds; `http://localhost:5173` in debug builds | Public URL of the app. Links in emails point here, and an `https` URL makes the cookies `Secure` |
+| `SMTP_URL`     | required when `APP_URL` is `https`                                  | SMTP server for verification and password reset emails, e.g. `smtps://user:password@host:465`    |
+| `EMAIL_FROM`   | required with SMTP                                                  | Sender, e.g. `WhatsApp Automator <no-reply@example.com>`                                         |
 
 Migrations in `server/migrations` are embedded in the binary and applied at startup.
+
+Without `SMTP_URL` the server writes each email, link included, to its log, which is enough for development and refused for an `https` `APP_URL`, since anyone who can read the log could use the links. Percent-encode special characters in the SMTP password (`@` becomes `%40`). `smtps://` connects on port 465 with TLS from the start; for port 587 use `smtp://user:password@host:587?tls=required`.
+
+## Accounts
+
+Sign-up takes an email address and a password. The account cannot sign in until the address is verified through the emailed link, which works for 24 hours. Opened in the browser that signed up, the link also signs the user in; anywhere else it only verifies the address, so a link opened in someone else's browser cannot sign them into the wrong account. Password reset links work once, for an hour, and end every session and outstanding link of the account. Sessions last 30 days and extend while in use; the browser holds them in an `HttpOnly` cookie, and the database stores only a SHA-256 hash of each session and link token.
