@@ -73,9 +73,14 @@ pub async fn setup_two_factor(
     let secret = two_factor::new_secret()?;
     let totp = two_factor::totp(secret.as_slice(), &user.email)?;
     let sealed = two_factor::seal(&state.cipher, user.id, secret.as_slice())?;
-    if !db::two_factor::save_pending(&state.pool, user.id, &sealed).await? {
+    let mut tx = state.pool.begin().await?;
+    // Takes turns with enabling, which could otherwise check its code against one key and turn on
+    // the one saved here
+    db::users::lock(&mut *tx, user.id).await?;
+    if !db::two_factor::save_pending(&mut *tx, user.id, &sealed).await? {
         return Err(AppError::Conflict("Two-step verification is already on"));
     }
+    tx.commit().await?;
 
     let otpauth_url = totp
         .to_url()
