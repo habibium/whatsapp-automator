@@ -185,6 +185,10 @@ export function TwoFactorSection() {
         setup={setup}
         email={user.email}
         onEnabled={() => void refresh()}
+        onRestart={() => {
+          setSetup(null)
+          setConfirming('setup')
+        }}
         onClose={() => setSetup(null)}
       />
       <RecoveryCodesDialog

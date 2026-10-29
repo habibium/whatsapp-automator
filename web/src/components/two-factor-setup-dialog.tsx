@@ -61,6 +61,8 @@ interface TwoFactorSetupDialogProps {
   email: string
   /** Two-step verification is on; recovery codes are on screen. */
   onEnabled: () => void
+  /** The server dropped this setup, so a new key needs the password again. */
+  onRestart: () => void
   onClose: () => void
 }
 
@@ -68,6 +70,7 @@ export function TwoFactorSetupDialog({
   setup,
   email,
   onEnabled,
+  onRestart,
   onClose,
 }: TwoFactorSetupDialogProps) {
   const [codes, setCodes] = useState<string[] | null>(null)
@@ -95,6 +98,7 @@ export function TwoFactorSetupDialog({
             setCodes(recoveryCodes)
             onEnabled()
           }}
+          onRestart={onRestart}
           onCancel={close}
         />
       ) : null}
@@ -105,10 +109,11 @@ export function TwoFactorSetupDialog({
 interface ScanStepProps {
   setup: TwoFactorSetup
   onEnabled: (recoveryCodes: string[]) => void
+  onRestart: () => void
   onCancel: () => void
 }
 
-function ScanStep({ setup, onEnabled, onCancel }: ScanStepProps) {
+function ScanStep({ setup, onEnabled, onRestart, onCancel }: ScanStepProps) {
   const [problem, setProblem] = useState<Problem | null>(null)
   const { copy, isCopied } = useClipboard({ announce: 'Setup key copied' })
 
@@ -117,7 +122,9 @@ function ScanStep({ setup, onEnabled, onCancel }: ScanStepProps) {
     validators: { onSubmit: schema },
     canSubmitWhenInvalid: true,
     listeners: {
-      onChange: () => setProblem(null),
+      // No code can revive an ended setup, so its banner stays
+      onChange: () =>
+        setProblem((current) => (current === 'stale' ? current : null)),
     },
     onSubmit: async ({ value, formApi }) => {
       try {
@@ -176,8 +183,15 @@ function ScanStep({ setup, onEnabled, onCancel }: ScanStepProps) {
               {problem === 'stale' ? (
                 <Banner
                   status="warning"
-                  title="This setup no longer works."
-                  description="Close it and turn on two-step verification again."
+                  title="This setup has ended."
+                  description="A setup lasts 15 minutes and allows five wrong codes. Start again for a new QR code."
+                  endContent={
+                    <Button
+                      label="Start again"
+                      size="sm"
+                      clickAction={onRestart}
+                    />
+                  }
                 />
               ) : problem === 'failed' ? (
                 <Banner
@@ -252,6 +266,7 @@ function ScanStep({ setup, onEnabled, onCancel }: ScanStepProps) {
                     label="Turn on"
                     variant="primary"
                     isLoading={isSubmitting}
+                    isDisabled={problem === 'stale'}
                   />
                 )}
               </form.Subscribe>
