@@ -9,6 +9,11 @@ import { Text } from '@astryxdesign/core/Text'
 import { api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
 import { EmailRequestForm } from '@/components/email-request-form'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 import { HOME_HREF, SIGNIN_HREF, setSessionUser } from '@/lib/session'
 import { stringParam } from '@/lib/search'
 
@@ -30,7 +35,11 @@ function VerifyEmail() {
       const { data, response } = await api.POST('/api/auth/verify-email', {
         body: { token: value },
       })
-      return { verified: data ?? null, status: response.status }
+      return {
+        verified: data ?? null,
+        status: response.status,
+        retryAfter: retryAfterSeconds(response),
+      }
     },
     // Replacing this history entry drops the spent token, so Back cannot replay it
     onSuccess: async ({ verified }) => {
@@ -67,10 +76,17 @@ function VerifyEmail() {
   if (verify.data?.status === 400) return <RequestNewLink />
 
   if (verify.isError || (verify.data && !verify.data.verified)) {
+    const isRateLimited = verify.data?.status === 429
     return (
       <AuthLayout
-        title="We couldn't check this link."
-        description="Something went wrong on our side, not with the link. Try again in a moment."
+        title={
+          isRateLimited ? TOO_MANY_ATTEMPTS : "We couldn't check this link."
+        }
+        description={
+          isRateLimited
+            ? tryAgainIn(verify.data?.retryAfter)
+            : 'Something went wrong on our side, not with the link. Try again in a moment.'
+        }
       >
         <Button
           label="Try again"
