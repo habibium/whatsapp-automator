@@ -73,6 +73,26 @@ pub async fn enable(db: impl PgExecutor<'_>, user_id: Uuid, step: i64) -> sqlx::
     Ok(())
 }
 
+/// Deletes the key, pending or not. Returns whether two-step verification was on.
+pub async fn delete_secret(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<bool> {
+    let enabled = sqlx::query_scalar!(
+        r#"DELETE FROM totp_secrets WHERE user_id = $1 RETURNING enabled_at IS NOT NULL AS "enabled!""#,
+        user_id
+    )
+    .fetch_optional(db)
+    .await?;
+
+    Ok(enabled == Some(true))
+}
+
+pub async fn delete_recovery_codes(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<()> {
+    sqlx::query!("DELETE FROM recovery_codes WHERE user_id = $1", user_id)
+        .execute(db)
+        .await?;
+
+    Ok(())
+}
+
 /// Replaces every recovery code of the user, used or not
 pub async fn replace_recovery_codes(
     conn: &mut PgConnection,

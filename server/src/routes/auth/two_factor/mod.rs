@@ -10,4 +10,5 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::get_two_factor))
         .routes(routes!(handlers::setup_two_factor))
         .routes(routes!(handlers::enable_two_factor))
+        .routes(routes!(handlers::disable_two_factor))
 }

@@ -2,7 +2,7 @@ use anyhow::Context;
 use axum::{
     Json,
     extract::State,
-    http::{HeaderValue, header},
+    http::{HeaderValue, StatusCode, header},
     response::IntoResponse,
 };
 use axum_extra::extract::cookie::CookieJar;
@@ -131,6 +131,38 @@ pub async fn enable_two_factor(
     alert(&state, user.email, SecurityEvent::TwoFactorEnabled)?;
 
     Ok((NO_STORE, jar, Json(RecoveryCodes { recovery_codes })))
+}
+
+/// Turn off two-step verification
+///
+/// Checks the password, then deletes the authenticator key and every recovery code, so signing in
+/// asks for the password alone again.
+#[utoipa::path(post, path = "/two-factor/disable", request_body = PasswordConfirmation, responses(
+    (status = NO_CONTENT),
+    (status = BAD_REQUEST, description = "The password is incorrect", body = ErrorBody),
+    (status = UNAUTHORIZED, body = ErrorBody),
+    (status = CONFLICT, description = "Two-step verification is already off", body = ErrorBody),
+    (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
+))]
+pub async fn disable_two_factor(
+    State(state): State<AppState>,
+    session: Session,
+    ValidatedJson(payload): ValidatedJson<PasswordConfirmation>,
+) -> Result<StatusCode, AppError> {
+    let user = session.user;
+    reauth::confirm_password(&state.pool, user.id, payload.password).await?;
+
+    let mut tx = state.pool.begin().await?;
+    db::users::lock(&mut *tx, user.id).await?;
+    if !db::two_factor::delete_secret(&mut *tx, user.id).await? {
+        return Err(AppError::Conflict("Two-step verification is already off"));
+    }
+    db::two_factor::delete_recovery_codes(&mut *tx, user.id).await?;
+    tx.commit().await?;
+
+    alert(&state, user.email, SecurityEvent::TwoFactorDisabled)?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn replace_recovery_codes(
