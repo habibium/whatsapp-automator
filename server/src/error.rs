@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use axum::{
     Json,
     extract::rejection::JsonRejection,
-    http::StatusCode,
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
@@ -21,7 +21,10 @@ pub enum AppError {
     EmailNotVerified,
 
     /// The signed-in user's password, asked again before a sensitive change, did not match
-    #[expect(dead_code, reason = "constructed by `auth::reauth`, which has no caller yet")]
+    #[expect(
+        dead_code,
+        reason = "constructed by `auth::reauth`, which has no caller yet"
+    )]
     #[error("Validation Failed")]
     IncorrectPassword,
 
@@ -33,6 +36,10 @@ pub enum AppError {
 
     #[error("Not Found")]
     NotFound,
+
+    /// Carries how long until the client may try again
+    #[error("Too many attempts, try again later")]
+    TooManyRequests(Duration),
 
     #[error("Validation Failed")]
     Validation(#[from] validator::ValidationErrors),
@@ -59,6 +66,15 @@ pub struct ErrorBody {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        // Rounded up, so a client that waits exactly this long is let through
+        let retry_after = match &self {
+            Self::TooManyRequests(wait) => Some([(
+                header::RETRY_AFTER,
+                wait.as_secs() + u64::from(wait.subsec_nanos() > 0),
+            )]),
+            _ => None,
+        };
+
         let (status, message, details) = match self {
             Self::Unauthorized | Self::InvalidCredentials => {
                 (StatusCode::UNAUTHORIZED, self.to_string(), None)
@@ -69,6 +85,8 @@ impl IntoResponse for AppError {
             }
 
             Self::NotFound => (StatusCode::NOT_FOUND, self.to_string(), None),
+
+            Self::TooManyRequests(_) => (StatusCode::TOO_MANY_REQUESTS, self.to_string(), None),
 
             Self::Validation(e) => {
                 let details = e
@@ -124,6 +142,7 @@ impl IntoResponse for AppError {
 
         (
             status,
+            retry_after,
             Json(ErrorBody {
                 error: message,
                 details,

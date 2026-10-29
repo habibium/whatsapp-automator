@@ -5,6 +5,7 @@ mod db;
 pub mod email;
 mod error;
 mod extract;
+mod rate_limit;
 mod routes;
 pub mod state;
 
@@ -25,7 +26,11 @@ pub fn router() -> (Router<AppState>, utoipa::openapi::OpenApi) {
             "/api",
             OpenApiRouter::new()
                 .merge(routes::health::router())
-                .nest("/auth", routes::auth::router())
+                // On the whole nest, so routes added to it later are limited too
+                .nest(
+                    "/auth",
+                    routes::auth::router().layer(rate_limit::client_ip_layer()),
+                )
                 // on the nested router so unknown /api paths 404 instead of falling
                 // through to the SPA fallback in main.rs
                 .fallback(routes::not_found)

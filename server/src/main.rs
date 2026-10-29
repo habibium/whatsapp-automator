@@ -1,4 +1,7 @@
-use std::{net::Ipv4Addr, sync::Arc};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
+};
 
 use axum::{
     Router,
@@ -116,7 +119,12 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, config.port)).await?;
     tracing::info!("server running on http://{}", listener.local_addr()?);
 
-    axum::serve(listener, app).await?;
+    // The peer address is what the rate limit keys on when no CLIENT_IP_HEADER is set
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }
