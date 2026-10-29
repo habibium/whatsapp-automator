@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Link, Outlet, createRootRoute } from '@tanstack/react-router'
+import { QueryClientProvider } from '@tanstack/react-query'
+import {
+  Link,
+  Outlet,
+  createRootRouteWithContext,
+} from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
@@ -8,15 +12,20 @@ import { Theme } from '@astryxdesign/core/theme'
 import { LinkProvider } from '@astryxdesign/core/Link'
 import { neutralTheme } from '@astryxdesign/theme-neutral/built'
 
+import type { QueryClient } from '@tanstack/react-query'
+
 import { NotFound } from '@/components/not-found'
+import { queryClient } from '@/lib/query-client'
 import { useColorScheme } from '@/lib/theme'
 
-export const Route = createRootRoute({
+interface RouterContext {
+  queryClient: QueryClient
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootComponent,
   notFoundComponent: NotFound,
 })
-
-const queryClient = new QueryClient()
 
 function RootComponent() {
   const { preference } = useColorScheme()

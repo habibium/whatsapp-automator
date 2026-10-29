@@ -13,16 +13,15 @@ import {
   colorVars,
   durationVars,
   easeVars,
+  sizeVars,
 } from '@astryxdesign/core/theme/tokens.stylex'
 
 import { ThemeToggle } from '@/components/theme-toggle'
-import { PRODUCT_NAME, Wordmark } from '@/components/wordmark'
+import { Wordmark } from '@/components/wordmark'
 
 /** Layout's own padding, so header, content and footer share one content line. */
 export const FRAME_PADDING = 6
 export const FRAME_WIDTH = 1080
-
-const CURRENT_YEAR = new Date().getFullYear()
 
 const styles = stylex.create({
   // Astryx leaves the body transparent, so the frame paints the page and
@@ -46,6 +45,8 @@ const styles = stylex.create({
     transitionProperty: 'opacity',
     transitionTimingFunction: easeVars['--ease-standard'],
   },
+  // A button's height, so pages without a header action keep the same header.
+  headerRow: { minHeight: sizeVars['--size-element-md'] },
 })
 
 interface SiteFrameProps {
@@ -63,7 +64,12 @@ export function SiteFrame({ action, children }: SiteFrameProps) {
       xstyle={styles.page}
       header={
         <LayoutHeader role="banner">
-          <HStack gap={4} justify="between" vAlign="center">
+          <HStack
+            gap={4}
+            justify="between"
+            vAlign="center"
+            xstyle={styles.headerRow}
+          >
             <Link href="/" color="primary" xstyle={styles.brand}>
               <Wordmark />
             </Link>

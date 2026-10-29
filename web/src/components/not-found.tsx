@@ -13,9 +13,9 @@ import {
 } from '@astryxdesign/core/theme/tokens.stylex'
 
 import { SiteFrame } from '@/components/site-frame'
+import { SIGNIN_HREF } from '@/lib/session'
 
 const COLUMN_WIDTH = 560
-const SIGNUP_HREF = '/signup'
 
 const fadeUp = stylex.keyframes({
   from: { opacity: 0, transform: 'translateY(10px)' },
@@ -63,11 +63,7 @@ export function NotFound() {
 
   return (
     <SiteFrame
-      // Signing in is one of the addresses that lands here, so the header
-      // offers the destination that does exist.
-      action={
-        <Button label="Create account" variant="secondary" href={SIGNUP_HREF} />
-      }
+      action={<Button label="Sign in" variant="ghost" href={SIGNIN_HREF} />}
     >
       <VStack minHeight="100%" paddingBlock={10} vAlign="center">
         <VStack gap={8} maxWidth={COLUMN_WIDTH}>
