@@ -1,5 +1,7 @@
 use std::{
+    hash::Hash,
     net::{IpAddr, Ipv6Addr, SocketAddr},
+    sync::Arc,
     time::Duration,
 };
 
@@ -9,12 +11,14 @@ use axum::{
     http::{HeaderName, Method, Request, Response},
     response::IntoResponse,
 };
-use governor::middleware::NoOpMiddleware;
+use governor::{DefaultKeyedRateLimiter, middleware::NoOpMiddleware};
 use tower_governor::{
     GovernorError, GovernorLayer, governor::GovernorConfigBuilder, key_extractor::KeyExtractor,
 };
 
 use crate::error::AppError;
+
+const SWEEP_EVERY: Duration = Duration::from_mins(10);
 
 /// Limits writes per client IP to a burst of 20, then one every 6 seconds (10 a minute). Reads
 /// pass untouched: route guards poll the session on every page load.
@@ -31,6 +35,7 @@ pub fn client_ip_layer() -> GovernorLayer<ClientIp, NoOpMiddleware, Body> {
         .key_extractor(ClientIp)
         .finish()
         .expect("period and burst size are nonzero");
+    sweep(config.limiter());
 
     GovernorLayer::new(config).error_handler(too_many_requests)
 }
@@ -91,4 +96,28 @@ fn key(ip: IpAddr) -> IpAddr {
         IpAddr::V6(ip) => IpAddr::V6(Ipv6Addr::from_bits(ip.to_bits() & !u128::from(u64::MAX))),
         ip @ IpAddr::V4(_) => ip,
     }
+}
+
+/// Drops keys whose quota has refilled, which the limiter would treat as new anyway. Holds the
+/// limiter weakly, so the sweep ends along with it.
+fn sweep<K>(limiter: &Arc<DefaultKeyedRateLimiter<K>>)
+where
+    K: Hash + Eq + Clone + Send + Sync + 'static,
+{
+    // The openapi binary builds the router outside a runtime, and never serves it
+    let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+        return;
+    };
+    let limiter = Arc::downgrade(limiter);
+    runtime.spawn(async move {
+        let mut interval = tokio::time::interval(SWEEP_EVERY);
+        loop {
+            interval.tick().await;
+            let Some(limiter) = limiter.upgrade() else {
+                break;
+            };
+            limiter.retain_recent();
+            limiter.shrink_to_fit();
+        }
+    });
 }
