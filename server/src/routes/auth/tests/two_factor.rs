@@ -224,6 +224,40 @@ async fn turning_on_takes_the_password_then_a_code_from_the_app(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn a_setup_waits_15_minutes_for_its_first_code(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let grace = app.enroll("grace@example.com").await;
+    let (user_id, session) = app.signed_in(EMAIL).await;
+    let totp = app.set_up(&session).await;
+    sqlx::query("UPDATE totp_secrets SET created_at = now() - interval '16 minutes'")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+
+    let expired = app
+        .post(
+            "/two-factor/enable",
+            json!({ "code": code(&totp, current_step()) }),
+            Some(&session),
+        )
+        .await;
+    assert_eq!(expired.status, StatusCode::CONFLICT);
+    assert_eq!(
+        app.get("/two-factor", &session).await.body["enabled"],
+        false
+    );
+
+    // A key that was turned on is just as old, and stays
+    let swept = crate::db::two_factor::delete_expired_setups(&app.pool, two_factor::SETUP_TTL)
+        .await
+        .unwrap();
+    assert_eq!(swept, 1);
+    let keys = "SELECT count(*) FROM totp_secrets WHERE user_id = $1";
+    assert_eq!(app.count(keys, user_id).await, 0);
+    assert_eq!(app.count(keys, grace.user_id).await, 1);
+}
+
+#[sqlx::test]
 async fn turning_on_signs_out_every_other_session(pool: PgPool) {
     let app = TestApp::new(pool);
     let (user_id, here) = app.signed_in(EMAIL).await;
