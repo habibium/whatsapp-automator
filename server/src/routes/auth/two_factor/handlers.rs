@@ -161,6 +161,7 @@ pub async fn disable_two_factor(
         return Err(AppError::Conflict("Two-step verification is already off"));
     }
     db::two_factor::delete_recovery_codes(&mut *tx, user.id).await?;
+    db::two_factor::delete_challenges_for_user(&mut *tx, user.id).await?;
     tx.commit().await?;
 
     alert(&state, user.email, SecurityEvent::TwoFactorDisabled)?;
