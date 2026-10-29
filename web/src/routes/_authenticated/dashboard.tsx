@@ -9,6 +9,7 @@ import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
 import { Divider } from '@astryxdesign/core/Divider'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
+import { HStack } from '@astryxdesign/core/HStack'
 import { Heading, Text } from '@astryxdesign/core/Text'
 import { Timestamp } from '@astryxdesign/core/Timestamp'
 import { VStack } from '@astryxdesign/core/VStack'
@@ -45,7 +46,12 @@ function Dashboard() {
 
   return (
     <SiteFrame
-      action={<Button label="Sign out" variant="ghost" clickAction={signOut} />}
+      action={
+        <HStack gap={2}>
+          <Button label="Security" variant="ghost" href="/settings" />
+          <Button label="Sign out" variant="ghost" clickAction={signOut} />
+        </HStack>
+      }
     >
       <VStack gap={8} maxWidth={COLUMN_WIDTH} paddingBlock={10}>
         {notice === 'email-verified' ? (
