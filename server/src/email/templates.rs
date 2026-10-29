@@ -45,8 +45,8 @@ pub fn reset_password(link: &Url) -> Email {
     })
 }
 
-/// An account change the owner should hear about; the email offers the remedy for one they did not
-/// make
+/// An account change or sign-in the owner should hear about; the email offers the remedy for one
+/// they did not make
 #[derive(Clone, Copy)]
 pub enum SecurityEvent {
     PasswordChanged,
@@ -55,6 +55,8 @@ pub enum SecurityEvent {
     RecoveryCodesRegenerated,
     PasskeyAdded,
     PasskeyRemoved,
+    /// A sign-in got the password right, then ran out of second-factor codes
+    TooManyWrongCodes,
 }
 
 /// # Errors
@@ -100,6 +102,13 @@ pub fn security_alert(event: SecurityEvent, app_url: &Url) -> anyhow::Result<Ema
             "A passkey was removed from your account",
             "A passkey was removed.",
             format!("A passkey can no longer sign in to your {PRODUCT_NAME} account."),
+        ),
+        SecurityEvent::TooManyWrongCodes => (
+            "Someone entered your password",
+            "Someone entered your password.",
+            format!(
+                "Someone signed in to your {PRODUCT_NAME} account with the right password, then got the two-step verification code wrong too many times, so the sign-in was stopped."
+            ),
         ),
     };
     let link = app_url

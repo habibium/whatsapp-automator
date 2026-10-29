@@ -27,6 +27,7 @@ const ACCOUNT_BURST: NonZeroU32 = NonZeroU32::new(10).unwrap();
 const ACCOUNT_REFILL: Duration = Duration::from_secs(90);
 const SECOND_FACTOR_BURST: NonZeroU32 = NonZeroU32::new(5).unwrap();
 const SECOND_FACTOR_REFILL: Duration = Duration::from_mins(30);
+const WRONG_CODES_ALERT_EVERY: Duration = Duration::from_hours(6);
 
 /// Limits writes per client IP to a burst of 20, then one every 6 seconds (10 a minute). Reads
 /// pass untouched: route guards poll the session on every page load.
@@ -118,6 +119,7 @@ pub struct RateLimits {
     signin: Arc<DefaultKeyedRateLimiter<String>>,
     reauth: Arc<DefaultKeyedRateLimiter<Uuid>>,
     second_factor: Arc<DefaultKeyedRateLimiter<Uuid>>,
+    wrong_codes_alert: Arc<DefaultKeyedRateLimiter<Uuid>>,
 }
 
 impl Default for RateLimits {
@@ -133,10 +135,14 @@ impl Default for RateLimits {
             signin: Arc::new(RateLimiter::keyed(account)),
             reauth: Arc::new(RateLimiter::keyed(account)),
             second_factor: Arc::new(RateLimiter::keyed(second_factor)),
+            wrong_codes_alert: Arc::new(RateLimiter::keyed(
+                Quota::with_period(WRONG_CODES_ALERT_EVERY).expect("alert period is nonzero"),
+            )),
         };
         sweep(&limits.signin);
         sweep(&limits.reauth);
         sweep(&limits.second_factor);
+        sweep(&limits.wrong_codes_alert);
 
         limits
     }
@@ -156,6 +162,12 @@ impl RateLimits {
     /// Counts a second-factor code checked for `user_id`, whichever sign-in or setup it is for
     pub(crate) fn second_factor(&self, user_id: Uuid) -> Result<(), AppError> {
         check(&self.second_factor, &user_id)
+    }
+
+    /// Whether `user_id` may be emailed about another sign-in that ran out of codes. One every 6
+    /// hours, or whoever holds the password could flood the owner's inbox.
+    pub(crate) fn wrong_codes_alert(&self, user_id: Uuid) -> bool {
+        self.wrong_codes_alert.check_key(&user_id).is_ok()
     }
 }
 

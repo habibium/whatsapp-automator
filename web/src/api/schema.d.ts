@@ -249,8 +249,9 @@ export interface paths {
          * Finish signing in
          * @description Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
          *     the authenticator app or a recovery code. Each code works once. After five wrong codes the
-         *     sign-in ends and has to start over from the password. An account gets five codes checked, then
-         *     one every 30 minutes, however many sign-ins they are spread over.
+         *     sign-in ends and has to start over from the password, and the owner is emailed, at most once
+         *     every 6 hours. An account gets five codes checked, then one every 30 minutes, however many
+         *     sign-ins they are spread over.
          */
         post: operations["verify_two_factor"];
         delete?: never;

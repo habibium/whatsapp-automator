@@ -206,8 +206,9 @@ pub async fn regenerate_recovery_codes(
 ///
 /// Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
 /// the authenticator app or a recovery code. Each code works once. After five wrong codes the
-/// sign-in ends and has to start over from the password. An account gets five codes checked, then
-/// one every 30 minutes, however many sign-ins they are spread over.
+/// sign-in ends and has to start over from the password, and the owner is emailed, at most once
+/// every 6 hours. An account gets five codes checked, then one every 30 minutes, however many
+/// sign-ins they are spread over.
 #[utoipa::path(post, path = "/signin/two-factor", request_body = SecondFactor, responses(
     (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "The session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong or was used already", body = ErrorBody),
@@ -246,15 +247,18 @@ pub async fn verify_two_factor(
 
     if !spend(&mut tx, &state.cipher, &user, &secret, &payload).await? {
         let attempts = db::two_factor::record_failed_attempt(&mut *tx, &token_hash).await?;
-        let error = if attempts >= two_factor::MAX_ATTEMPTS {
-            db::two_factor::delete_challenge(&mut *tx, &token_hash).await?;
-            AppError::SignInExpired
-        } else {
-            AppError::IncorrectCode(payload.field())
-        };
-        // The request fails, but the attempt has to count
+        if attempts < two_factor::MAX_ATTEMPTS {
+            // The request fails, but the attempt has to count
+            tx.commit().await?;
+            return Err(AppError::IncorrectCode(payload.field()));
+        }
+        db::two_factor::delete_challenge(&mut *tx, &token_hash).await?;
         tx.commit().await?;
-        return Err(error);
+        // Whoever got this far had the password, and the owner needs to know it leaked
+        if state.rate_limits.wrong_codes_alert(user.id) {
+            alert(&state, user.email, SecurityEvent::TooManyWrongCodes)?;
+        }
+        return Err(AppError::SignInExpired);
     }
 
     db::two_factor::delete_challenge(&mut *tx, &token_hash).await?;
