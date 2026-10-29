@@ -4,15 +4,18 @@ import { HStack } from '@astryxdesign/core/HStack'
 import { Text } from '@astryxdesign/core/Text'
 
 import { api } from '@/api/client'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 import { useCooldown } from '@/lib/use-cooldown'
 
 /** The server sends at most one link a minute per account and ignores the rest silently. */
 const COOLDOWN_SECONDS = 60
 
-const OUTCOME_TEXT = {
-  sent: 'Sent. It can take a minute to arrive.',
-  failed: 'Could not send it. Try again in a moment.',
-} as const
+const SENT_TEXT = 'Sent. It can take a minute to arrive.'
+const FAILED_TEXT = 'Could not send it. Try again in a moment.'
 
 interface ResendVerificationProps {
   email: string
@@ -21,17 +24,25 @@ interface ResendVerificationProps {
 /** For the moment right after a link went out, so the first wait is already running. */
 export function ResendVerification({ email }: ResendVerificationProps) {
   const { remaining, start } = useCooldown(COOLDOWN_SECONDS, true)
-  const [outcome, setOutcome] = useState<keyof typeof OUTCOME_TEXT | null>(null)
+  const [outcome, setOutcome] = useState('')
 
   const resend = async () => {
     try {
       const { response } = await api.POST('/api/auth/resend-verification', {
         body: { email },
       })
-      setOutcome(response.ok ? 'sent' : 'failed')
-      if (response.ok) start()
+      if (response.ok) {
+        setOutcome(SENT_TEXT)
+        start()
+      } else if (response.status === 429) {
+        const retryAfter = retryAfterSeconds(response)
+        setOutcome(`${TOO_MANY_ATTEMPTS} ${tryAgainIn(retryAfter)}`)
+        start(retryAfter)
+      } else {
+        setOutcome(FAILED_TEXT)
+      }
     } catch {
-      setOutcome('failed')
+      setOutcome(FAILED_TEXT)
     }
   }
 
@@ -45,7 +56,7 @@ export function ResendVerification({ email }: ResendVerificationProps) {
       />
       {/* Present from the start: a live region only announces changes to itself. */}
       <Text type="supporting" role="status">
-        {outcome ? OUTCOME_TEXT[outcome] : ''}
+        {outcome}
       </Text>
     </HStack>
   )
