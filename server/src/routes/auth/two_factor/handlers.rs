@@ -95,12 +95,14 @@ pub async fn setup_two_factor(
 /// for a code too. Returns ten recovery codes, each good for one sign-in without the app. Every
 /// session of the account ends, this one included, and this browser gets a new one, so a session
 /// someone else may already hold does not outlast the change. After five wrong codes the pending
-/// key is deleted and the setup has to start again.
+/// key is deleted and the setup has to start again. Codes here count toward the account's limit
+/// on codes at sign-in.
 #[utoipa::path(post, path = "/two-factor/enable", request_body = AuthenticatorCode, responses(
     (status = OK, body = RecoveryCodes, headers(("set-cookie" = String, description = "A new session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong", body = ErrorBody),
     (status = UNAUTHORIZED, body = ErrorBody),
     (status = CONFLICT, description = "Already on, or no setup is waiting: it was never started, has expired or took five wrong codes", body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client, or codes tried for this account", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn enable_two_factor(
@@ -120,6 +122,7 @@ pub async fn enable_two_factor(
     let sealed = db::two_factor::find_pending(&mut *tx, user.id, two_factor::SETUP_TTL)
         .await?
         .ok_or(AppError::Conflict("Start the setup first"))?;
+    state.rate_limits.second_factor(user.id)?;
     let key = two_factor::open(&state.cipher, user.id, &sealed)?;
     let totp = two_factor::totp(&key, &user.email)?;
     let Some(step) = two_factor::verify_code(&totp, &payload.code, None) else {

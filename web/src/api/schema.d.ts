@@ -358,7 +358,8 @@ export interface paths {
          *     for a code too. Returns ten recovery codes, each good for one sign-in without the app. Every
          *     session of the account ends, this one included, and this browser gets a new one, so a session
          *     someone else may already hold does not outlast the change. After five wrong codes the pending
-         *     key is deleted and the setup has to start again.
+         *     key is deleted and the setup has to start again. Codes here count toward the account's limit
+         *     on codes at sign-in.
          */
         post: operations["enable_two_factor"];
         delete?: never;
@@ -1442,6 +1443,17 @@ export interface operations {
             /** @description Already on, or no setup is waiting: it was never started, has expired or took five wrong codes */
             409: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many writes from this client, or codes tried for this account */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
                     [name: string]: unknown;
                 };
                 content: {
