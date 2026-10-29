@@ -6,9 +6,10 @@ use axum::{
     extract::ConnectInfo,
     http::{HeaderName, Request, StatusCode, header},
 };
+use serde_json::json;
 use sqlx::PgPool;
 
-use super::{TestApp, TestResponse};
+use super::{PASSWORD, TestApp, TestResponse};
 use crate::rate_limit::ClientIpHeader;
 
 /// Writes a client may make at once before the limit refuses one
@@ -32,6 +33,16 @@ async fn signout(app: &TestApp, peer: &str, headers: &[(&str, &str)]) -> TestRes
     }
     app.send(from_peer(request.body(Body::empty()).unwrap(), peer))
         .await
+}
+
+async fn signin(app: &TestApp, peer: &str, email: &str, password: &str) -> TestResponse {
+    let request = Request::post("/api/auth/signin")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({ "email": email, "password": password }).to_string(),
+        ))
+        .unwrap();
+    app.send(from_peer(request, peer)).await
 }
 
 fn retry_after(response: &TestResponse) -> u64 {
@@ -128,4 +139,28 @@ async fn ipv6_clients_share_a_limit_across_their_64(pool: PgPool) {
     assert_eq!(same_64.status, StatusCode::TOO_MANY_REQUESTS);
     let next_64 = signout(&app, "2001:db8:1:3::1", &[]).await;
     assert_eq!(next_64.status, StatusCode::NO_CONTENT);
+}
+
+#[sqlx::test]
+async fn sign_in_attempts_are_limited_per_account_from_any_address(pool: PgPool) {
+    let app = TestApp::new(pool);
+    app.verified_user("ada@example.com").await;
+    app.verified_user("grace@example.com").await;
+
+    // Each from its own address, as a botnet would send them, so no IP limit is reached
+    for n in 1..=10 {
+        let peer = format!("198.51.100.{n}");
+        let guess = signin(&app, &peer, "Ada@example.com", "wrong password").await;
+        assert_eq!(guess.status, StatusCode::UNAUTHORIZED);
+    }
+
+    let refused = signin(&app, "198.51.100.11", "ada@example.com", PASSWORD).await;
+    assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(refused.body["error"], TOO_MANY);
+    // One attempt comes back every 90 seconds
+    assert!((1..=90).contains(&retry_after(&refused)));
+    assert!(refused.set_cookie("session").is_none());
+
+    let other_account = signin(&app, "198.51.100.11", "grace@example.com", PASSWORD).await;
+    assert_eq!(other_account.status, StatusCode::OK);
 }
