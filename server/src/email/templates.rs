@@ -256,7 +256,23 @@ fn escape(text: &str) -> String {
 mod tests {
     use url::Url;
 
-    use super::{SecurityEvent, escape, reset_password, security_alert, verify_email};
+    use super::{RESET_NOW, SecurityEvent, escape, reset_password, security_alert, verify_email};
+
+    const EVERY_EVENT: [SecurityEvent; 8] = [
+        SecurityEvent::PasswordChanged,
+        SecurityEvent::TwoFactorEnabled,
+        SecurityEvent::TwoFactorDisabled,
+        SecurityEvent::RecoveryCodesRegenerated,
+        SecurityEvent::PasskeyAdded,
+        SecurityEvent::PasskeyRemoved,
+        SecurityEvent::TooManyWrongCodes,
+        SecurityEvent::RecoveryCodeUsed { remaining: 9 },
+    ];
+
+    fn alert_text(event: SecurityEvent) -> String {
+        let app_url = Url::parse("https://example.com/").unwrap();
+        security_alert(event, &app_url).unwrap().text
+    }
 
     #[test]
     fn escapes_markup() {
@@ -294,5 +310,72 @@ mod tests {
         let email = security_alert(SecurityEvent::TwoFactorDisabled, &app_url).unwrap();
 
         assert!(email.text.contains("https://example.com/forgot-password"));
+    }
+
+    #[test]
+    fn every_security_alert_renders_both_parts_with_a_remedy() {
+        let app_url = Url::parse("https://example.com/").unwrap();
+
+        for event in EVERY_EVENT {
+            let email = security_alert(event, &app_url).unwrap();
+            let paragraphs: Vec<&str> = email.text.trim_end().split("\n\n").collect();
+            let [heading, body, action, footer] = paragraphs[..] else {
+                panic!("unexpected layout: {}", email.text);
+            };
+            let (_, link) = action.split_once(": ").unwrap();
+
+            assert!(body.contains("If this wasn't you"));
+            assert!(
+                email
+                    .html
+                    .contains(&format!("<title>{}</title>", email.subject))
+            );
+            for part in [heading, body, footer] {
+                assert!(email.html.contains(part));
+            }
+            assert!(email.html.contains(&format!(r#"href="{link}""#)));
+        }
+    }
+
+    #[test]
+    fn each_security_alert_offers_a_remedy_that_works_for_it() {
+        let passkey = alert_text(SecurityEvent::PasskeyAdded);
+        assert!(passkey.contains("remove it in your security settings first"));
+        assert!(passkey.contains("Review your passkeys: https://example.com/settings"));
+
+        assert!(
+            alert_text(SecurityEvent::TwoFactorEnabled)
+                .contains("ask whoever runs this service to turn it off for you")
+        );
+        assert!(
+            alert_text(SecurityEvent::TooManyWrongCodes)
+                .contains("someone else knows your password: reset it now")
+        );
+        for event in [
+            SecurityEvent::RecoveryCodesRegenerated,
+            SecurityEvent::RecoveryCodeUsed { remaining: 9 },
+        ] {
+            assert!(alert_text(event).contains("then create new recovery codes"));
+        }
+        for event in [
+            SecurityEvent::PasswordChanged,
+            SecurityEvent::TwoFactorDisabled,
+            SecurityEvent::PasskeyRemoved,
+        ] {
+            let text = alert_text(event);
+            assert!(text.contains(RESET_NOW));
+            assert!(text.contains("Reset your password: https://example.com/forgot-password"));
+        }
+    }
+
+    #[test]
+    fn recovery_code_alert_says_how_many_are_left() {
+        for (remaining, left) in [
+            (0, "No recovery codes are left."),
+            (1, "1 recovery code is left."),
+            (9, "9 recovery codes are left."),
+        ] {
+            assert!(alert_text(SecurityEvent::RecoveryCodeUsed { remaining }).contains(left));
+        }
     }
 }
