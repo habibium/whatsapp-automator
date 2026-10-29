@@ -1,6 +1,8 @@
 use sqlx::{PgConnection, PgExecutor};
 use uuid::Uuid;
 
+use super::users::User;
+
 pub struct Status {
     pub enabled: bool,
     pub recovery_codes_remaining: i64,
@@ -10,6 +12,7 @@ pub struct Secret {
     /// Sealed by `crypto::Cipher`
     pub sealed: Vec<u8>,
     pub enabled: bool,
+    pub last_used_step: Option<i64>,
 }
 
 pub async fn status(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<Status> {
@@ -52,7 +55,7 @@ pub async fn save_pending(
 pub async fn find_secret(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<Option<Secret>> {
     sqlx::query_as!(
         Secret,
-        r#"SELECT secret AS sealed, enabled_at IS NOT NULL AS "enabled!"
+        r#"SELECT secret AS sealed, enabled_at IS NOT NULL AS "enabled!", last_used_step
            FROM totp_secrets WHERE user_id = $1"#,
         user_id
     )
@@ -73,6 +76,22 @@ pub async fn enable(db: impl PgExecutor<'_>, user_id: Uuid, step: i64) -> sqlx::
     Ok(())
 }
 
+/// Records the step of a code that just worked. Returns `false` when that step, or a later one,
+/// was recorded already, which makes the code a replay.
+pub async fn record_step(db: impl PgExecutor<'_>, user_id: Uuid, step: i64) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE totp_secrets SET last_used_step = $2 \
+         WHERE user_id = $1 AND enabled_at IS NOT NULL \
+         AND (last_used_step IS NULL OR last_used_step < $2)",
+        user_id,
+        step
+    )
+    .execute(db)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
+}
+
 /// Deletes the key, pending or not. Returns whether two-step verification was on.
 pub async fn delete_secret(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<bool> {
     let enabled = sqlx::query_scalar!(
@@ -83,6 +102,36 @@ pub async fn delete_secret(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Resu
     .await?;
 
     Ok(enabled == Some(true))
+}
+
+pub async fn unused_recovery_codes(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+) -> sqlx::Result<Vec<Vec<u8>>> {
+    sqlx::query_scalar!(
+        "SELECT code_hash FROM recovery_codes WHERE user_id = $1 AND used_at IS NULL",
+        user_id
+    )
+    .fetch_all(db)
+    .await
+}
+
+/// Returns `false` when the code was used already
+pub async fn use_recovery_code(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    code_hash: &[u8],
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE recovery_codes SET used_at = now() \
+         WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL",
+        user_id,
+        code_hash
+    )
+    .execute(db)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
 }
 
 pub async fn delete_recovery_codes(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<()> {
@@ -100,15 +149,54 @@ pub async fn replace_recovery_codes(
     hashes: &[[u8; 32]],
 ) -> sqlx::Result<()> {
     let hashes: Vec<Vec<u8>> = hashes.iter().map(|hash| hash.to_vec()).collect();
-    sqlx::query!("DELETE FROM recovery_codes WHERE user_id = $1", user_id)
-        .execute(&mut *conn)
-        .await?;
+    delete_recovery_codes(&mut *conn, user_id).await?;
     sqlx::query!(
         "INSERT INTO recovery_codes (user_id, code_hash) SELECT $1, unnest($2::bytea[])",
         user_id,
         &hashes
     )
     .execute(&mut *conn)
+    .await?;
+
+    Ok(())
+}
+
+/// The user whose sign-in the challenge holds, or `None` when it is unknown, expired or used up
+pub async fn find_challenge(
+    db: impl PgExecutor<'_>,
+    token_hash: &[u8],
+) -> sqlx::Result<Option<User>> {
+    sqlx::query_as!(
+        User,
+        "SELECT u.id, u.email, u.verified_at, u.created_at, u.updated_at \
+         FROM two_factor_challenges c JOIN users u ON u.id = c.user_id \
+         WHERE c.token_hash = $1 AND c.expires_at > now()",
+        token_hash
+    )
+    .fetch_optional(db)
+    .await
+}
+
+/// Counts a wrong code against the challenge and returns how many it has had
+pub async fn record_failed_attempt(
+    db: impl PgExecutor<'_>,
+    token_hash: &[u8],
+) -> sqlx::Result<i16> {
+    sqlx::query_scalar!(
+        "UPDATE two_factor_challenges SET attempts = attempts + 1 WHERE token_hash = $1 \
+         RETURNING attempts",
+        token_hash
+    )
+    .fetch_one(db)
+    .await
+}
+
+pub async fn delete_challenge(db: impl PgExecutor<'_>, token_hash: &[u8]) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM two_factor_challenges WHERE token_hash = $1",
+        token_hash
+    )
+    .execute(db)
     .await?;
 
     Ok(())

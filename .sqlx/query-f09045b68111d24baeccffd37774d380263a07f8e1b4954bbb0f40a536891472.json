@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT secret AS sealed, enabled_at IS NOT NULL AS \"enabled!\"\n           FROM totp_secrets WHERE user_id = $1",
+  "query": "SELECT secret AS sealed, enabled_at IS NOT NULL AS \"enabled!\", last_used_step\n           FROM totp_secrets WHERE user_id = $1",
   "describe": {
     "columns": [
       {
@@ -19,6 +19,17 @@
         "name": "enabled!",
         "type_info": "Bool",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_used_step",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "totp_secrets",
+            "name": "last_used_step"
+          }
+        }
       }
     ],
     "parameters": {
@@ -28,8 +39,9 @@
     },
     "nullable": [
       false,
-      null
+      null,
+      true
     ]
   },
-  "hash": "109bcc0b95585983c00c9b3ee286c53b9138622c8c027891af07da3ad0cea1b1"
+  "hash": "f09045b68111d24baeccffd37774d380263a07f8e1b4954bbb0f40a536891472"
 }

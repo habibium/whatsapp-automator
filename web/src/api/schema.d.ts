@@ -107,6 +107,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/signin/two-factor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish signing in
+         * @description Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
+         *     the authenticator app or a recovery code. Each code works once. After five wrong codes the
+         *     sign-in ends and has to start over from the password.
+         */
+        post: operations["verify_two_factor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/signout": {
         parameters: {
             query?: never;
@@ -341,6 +363,10 @@ export interface components {
             /** @description The token from the reset email's link */
             token: string;
         };
+        RecoveryCode: {
+            /** @description One of the codes saved when two-step verification was turned on */
+            recovery_code: string;
+        };
         RecoveryCodes: {
             /**
              * @description Each signs in once in place of an authenticator code. The server keeps only their hashes,
@@ -348,6 +374,8 @@ export interface components {
              */
             recovery_codes: string[];
         };
+        /** @description The second step of a sign-in: a code from the authenticator app, or a recovery code */
+        SecondFactor: components["schemas"]["AuthenticatorCode"] | components["schemas"]["RecoveryCode"];
         SessionResponse: {
             user: null | components["schemas"]["UserResponse"];
         };
@@ -575,6 +603,57 @@ export interface operations {
             };
             /** @description The address is not verified yet */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    verify_two_factor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecondFactor"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description The session cookie */
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description The code is wrong or was used already */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description No sign-in is waiting: it expired, ran out of attempts or never started */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

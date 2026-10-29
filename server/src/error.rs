@@ -20,6 +20,10 @@ pub enum AppError {
     #[error("Verify your email address before signing in")]
     EmailNotVerified,
 
+    /// No sign-in waits for a second factor: it expired, ran out of attempts, or never started
+    #[error("This sign-in has ended; sign in again")]
+    SignInExpired,
+
     /// The signed-in user's password, asked again before a sensitive change, did not match
     #[error("Validation Failed")]
     IncorrectPassword,
@@ -63,7 +67,7 @@ pub struct ErrorBody {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message, details) = match self {
-            Self::Unauthorized | Self::InvalidCredentials => {
+            Self::Unauthorized | Self::InvalidCredentials | Self::SignInExpired => {
                 (StatusCode::UNAUTHORIZED, self.to_string(), None)
             }
 

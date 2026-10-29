@@ -248,6 +248,73 @@
         }
       }
     },
+    "/api/auth/signin/two-factor": {
+      "post": {
+        "summary": "Finish signing in",
+        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password.",
+        "operationId": "verify_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecondFactor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The session cookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The code is wrong or was used already",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No sign-in is waiting: it expired, ran out of attempts or never started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/signout": {
       "post": {
         "summary": "Sign out",
@@ -878,6 +945,18 @@
           }
         }
       },
+      "RecoveryCode": {
+        "type": "object",
+        "required": [
+          "recovery_code"
+        ],
+        "properties": {
+          "recovery_code": {
+            "type": "string",
+            "description": "One of the codes saved when two-step verification was turned on"
+          }
+        }
+      },
       "RecoveryCodes": {
         "type": "object",
         "required": [
@@ -892,6 +971,17 @@
             "description": "Each signs in once in place of an authenticator code. The server keeps only their hashes,\nso this response is the one time they are shown."
           }
         }
+      },
+      "SecondFactor": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AuthenticatorCode"
+          },
+          {
+            "$ref": "#/components/schemas/RecoveryCode"
+          }
+        ],
+        "description": "The second step of a sign-in: a code from the authenticator app, or a recovery code"
       },
       "SessionResponse": {
         "type": "object",

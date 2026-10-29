@@ -10,19 +10,22 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use super::dto::{
-    AuthenticatorCode, PasswordConfirmation, RecoveryCodes, TwoFactorSetup, TwoFactorStatus,
+    AuthenticatorCode, PasswordConfirmation, RecoveryCode, RecoveryCodes, SecondFactor,
+    TwoFactorSetup, TwoFactorStatus,
 };
 use crate::{
     AppState,
     auth::{
-        reauth,
+        cookie, reauth,
         session::{self, Session},
-        two_factor,
+        token, two_factor,
     },
-    db,
+    crypto::Cipher,
+    db::{self, users::User},
     email::templates::{self, SecurityEvent},
     error::{AppError, ErrorBody},
     extract::ValidatedJson,
+    routes::auth::dto::UserResponse,
 };
 
 /// Responses here carry keys, codes or account state that no cache may keep
@@ -196,6 +199,92 @@ pub async fn regenerate_recovery_codes(
     alert(&state, user.email, SecurityEvent::RecoveryCodesRegenerated)?;
 
     Ok((NO_STORE, Json(RecoveryCodes { recovery_codes })))
+}
+
+/// Finish signing in
+///
+/// Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
+/// the authenticator app or a recovery code. Each code works once. After five wrong codes the
+/// sign-in ends and has to start over from the password.
+#[utoipa::path(post, path = "/signin/two-factor", request_body = SecondFactor, responses(
+    (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "The session cookie"))),
+    (status = BAD_REQUEST, description = "The code is wrong or was used already", body = ErrorBody),
+    (status = UNAUTHORIZED, description = "No sign-in is waiting: it expired, ran out of attempts or never started", body = ErrorBody),
+    (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
+))]
+pub async fn verify_two_factor(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    ValidatedJson(payload): ValidatedJson<SecondFactor>,
+) -> Result<(CookieJar, Json<UserResponse>), AppError> {
+    let secure = state.secure_cookies();
+    let token_hash = cookie::TWO_FACTOR
+        .read(&jar, secure)
+        .map(token::hash)
+        .ok_or(AppError::SignInExpired)?;
+
+    let mut tx = state.pool.begin().await?;
+    let owner = db::two_factor::find_challenge(&mut *tx, &token_hash)
+        .await?
+        .ok_or(AppError::SignInExpired)?;
+    // Attempts at this sign-in take turns. A password reset either commits first and takes the
+    // challenge with it, hence the second read, or waits and then ends the session started here.
+    db::users::lock(&mut *tx, owner.id).await?;
+    let user = db::two_factor::find_challenge(&mut *tx, &token_hash)
+        .await?
+        .ok_or(AppError::SignInExpired)?;
+    // Turning two-step verification off since the password step ends the sign-in too
+    let secret = db::two_factor::find_secret(&mut *tx, user.id)
+        .await?
+        .filter(|secret| secret.enabled)
+        .ok_or(AppError::SignInExpired)?;
+
+    if !spend(&mut tx, &state.cipher, &user, &secret, &payload).await? {
+        let attempts = db::two_factor::record_failed_attempt(&mut *tx, &token_hash).await?;
+        let error = if attempts >= two_factor::MAX_ATTEMPTS {
+            db::two_factor::delete_challenge(&mut *tx, &token_hash).await?;
+            AppError::SignInExpired
+        } else {
+            AppError::IncorrectCode(payload.field())
+        };
+        // The request fails, but the attempt has to count
+        tx.commit().await?;
+        return Err(error);
+    }
+
+    db::two_factor::delete_challenge(&mut *tx, &token_hash).await?;
+    let jar = cookie::TWO_FACTOR.clear(jar, secure);
+    let jar = session::start(&mut *tx, jar, user.id, secure).await?;
+    tx.commit().await?;
+
+    Ok((jar, Json(user.into())))
+}
+
+/// Uses up the code when it checks out; returns whether it did
+async fn spend(
+    conn: &mut PgConnection,
+    cipher: &Cipher,
+    user: &User,
+    secret: &db::two_factor::Secret,
+    second_factor: &SecondFactor,
+) -> Result<bool, AppError> {
+    match second_factor {
+        SecondFactor::Code(AuthenticatorCode { code }) => {
+            let key = two_factor::open(cipher, user.id, &secret.sealed)?;
+            let totp = two_factor::totp(&key, &user.email)?;
+            match two_factor::verify_code(&totp, code, secret.last_used_step) {
+                Some(step) => Ok(db::two_factor::record_step(conn, user.id, step).await?),
+                None => Ok(false),
+            }
+        }
+        SecondFactor::RecoveryCode(RecoveryCode { recovery_code }) => {
+            let hashes = db::two_factor::unused_recovery_codes(&mut *conn, user.id).await?;
+            match two_factor::find_recovery_code(user.id, recovery_code, &hashes) {
+                Some(hash) => Ok(db::two_factor::use_recovery_code(conn, user.id, hash).await?),
+                None => Ok(false),
+            }
+        }
+    }
 }
 
 async fn replace_recovery_codes(

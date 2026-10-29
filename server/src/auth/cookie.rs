@@ -1,7 +1,7 @@
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use chrono::TimeDelta;
 
-use super::{session, token::Purpose};
+use super::{session, token::Purpose, two_factor};
 
 /// An `HttpOnly`, `SameSite=Lax` cookie on `/`. Over https it is also `Secure` and takes the
 /// `__Host-` prefix, so no other subdomain can plant one; plain-http development cannot meet that
@@ -23,6 +23,13 @@ pub const SIGNUP: AuthCookie = AuthCookie {
     name: "signup",
     secure_name: "__Host-signup",
     max_age: Purpose::VerifyEmail.ttl(),
+};
+
+/// Carries a sign-in whose password checked out over to its second factor
+pub const TWO_FACTOR: AuthCookie = AuthCookie {
+    name: "two_factor",
+    secure_name: "__Host-two_factor",
+    max_age: two_factor::CHALLENGE_TTL,
 };
 
 impl AuthCookie {

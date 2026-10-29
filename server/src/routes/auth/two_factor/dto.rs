@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use validator::Validate;
+use validator::{Validate, ValidationErrors};
 
 use crate::db;
 
@@ -16,6 +16,40 @@ pub(super) struct AuthenticatorCode {
     /// The 6-digit code the authenticator app shows
     #[validate(length(min = 1, max = 16, message = "must be between 1 and 16 characters"))]
     pub code: String,
+}
+
+#[derive(Deserialize, Validate, ToSchema)]
+pub(super) struct RecoveryCode {
+    /// One of the codes saved when two-step verification was turned on
+    #[validate(length(min = 1, max = 64, message = "must be between 1 and 64 characters"))]
+    pub recovery_code: String,
+}
+
+/// The second step of a sign-in: a code from the authenticator app, or a recovery code
+#[derive(Deserialize, ToSchema)]
+#[serde(untagged)]
+pub(super) enum SecondFactor {
+    Code(AuthenticatorCode),
+    RecoveryCode(RecoveryCode),
+}
+
+impl SecondFactor {
+    /// The request field that holds the code, for an error to point at
+    pub const fn field(&self) -> &'static str {
+        match self {
+            Self::Code(_) => "code",
+            Self::RecoveryCode(_) => "recovery_code",
+        }
+    }
+}
+
+impl Validate for SecondFactor {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        match self {
+            Self::Code(code) => code.validate(),
+            Self::RecoveryCode(code) => code.validate(),
+        }
+    }
 }
 
 #[derive(Serialize, ToSchema)]

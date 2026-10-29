@@ -1,11 +1,18 @@
 use base64::prelude::{BASE64_STANDARD, Engine as _};
+use chrono::TimeDelta;
 use qrcode::{QrCode, render::svg};
 use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 use totp_rs::{Algorithm, Builder, Totp};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
 use crate::crypto::Cipher;
+
+/// How long a sign-in whose password checked out waits for its second factor
+pub const CHALLENGE_TTL: TimeDelta = TimeDelta::minutes(5);
+/// Wrong codes a sign-in may try before it starts over from the password
+pub const MAX_ATTEMPTS: i16 = 5;
 
 /// The label authenticator apps show next to the account's codes
 const ISSUER: &str = "WhatsApp Automator";
@@ -116,12 +123,31 @@ pub fn hash_recovery_code(user_id: Uuid, code: &str) -> [u8; 32] {
         .into()
 }
 
+/// The stored hash that `code` matches. Every hash is compared in full and in constant time, so
+/// the time taken says nothing about how close a guess came.
+pub fn find_recovery_code<'a>(
+    user_id: Uuid,
+    code: &str,
+    hashes: &'a [Vec<u8>],
+) -> Option<&'a [u8]> {
+    let guess = hash_recovery_code(user_id, code);
+
+    hashes.iter().fold(None, |found, hash| {
+        if bool::from(hash.as_slice().ct_eq(&guess)) {
+            Some(hash.as_slice())
+        } else {
+            found
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use uuid::Uuid;
 
     use super::{
-        hash_recovery_code, new_recovery_codes, new_secret, open, qr_code, seal, totp, verify_code,
+        find_recovery_code, hash_recovery_code, new_recovery_codes, new_secret, open, qr_code,
+        seal, totp, verify_code,
     };
     use crate::crypto::Cipher;
 
@@ -189,5 +215,25 @@ mod tests {
         assert_eq!(hash_recovery_code(user_id, " OIL1 ABCD-efgh jkmn "), hash);
         assert_ne!(hash_recovery_code(user_id, "0il1-abcd-efgh-jkmp"), hash);
         assert_ne!(hash_recovery_code(Uuid::new_v4(), code), hash);
+    }
+
+    #[test]
+    fn finds_the_recovery_code_among_the_stored_hashes() {
+        let user_id = Uuid::new_v4();
+        let codes = new_recovery_codes().unwrap();
+        let hashes: Vec<Vec<u8>> = codes
+            .iter()
+            .map(|code| hash_recovery_code(user_id, code).to_vec())
+            .collect();
+
+        assert_eq!(
+            find_recovery_code(user_id, &codes[3].to_uppercase(), &hashes),
+            Some(hashes[3].as_slice())
+        );
+        assert_eq!(
+            find_recovery_code(user_id, "0000-0000-0000-0000", &hashes),
+            None
+        );
+        assert_eq!(find_recovery_code(Uuid::new_v4(), &codes[3], &hashes), None);
     }
 }
