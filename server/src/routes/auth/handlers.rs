@@ -43,6 +43,10 @@ pub async fn signup(
     jar: CookieJar,
     ValidatedJson(payload): ValidatedJson<Credentials>,
 ) -> Result<(CookieJar, Json<UserResponse>), AppError> {
+    state
+        .pwned_passwords
+        .reject_breached("password", &payload.password)
+        .await?;
     let password_hash = password::hash(payload.password).await?;
     // Lets the verification link sign in this browser, and no other
     let binding = Token::generate()?;

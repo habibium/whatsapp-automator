@@ -14,7 +14,9 @@ use uuid::Uuid;
 
 use crate::{
     auth::{
-        password, session,
+        password,
+        pwned::PwnedPasswords,
+        session,
         token::{Purpose, Token},
     },
     db,
@@ -68,6 +70,7 @@ impl TestApp {
             mailer: Mailer::Log,
             app_url: Arc::new(Url::parse(app_url).unwrap()),
             rate_limits: RateLimits::default(),
+            pwned_passwords: PwnedPasswords::Listed(&[]),
         };
         let (router, _) = crate::router();
 

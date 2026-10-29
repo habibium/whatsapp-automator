@@ -15,6 +15,7 @@ use utoipa_axum::router::OpenApiRouter;
 
 use crate::state::AppState;
 pub use crate::{
+    auth::pwned::PwnedPasswords,
     db::spawn_cleanup,
     rate_limit::{ClientIpHeader, RateLimits},
 };
