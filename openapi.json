@@ -96,7 +96,7 @@
     "/api/auth/reset-password": {
       "post": {
         "summary": "Reset password",
-        "description": "Spends the token from a reset email and sets the new password. Every session and every other\nemailed link of the account stops working, so the user signs in again everywhere.",
+        "description": "Spends the token from a reset email and sets the new password. Every session, sign-in waiting\nfor a second factor and other emailed link of the account stops working, so the user signs in\nagain everywhere.",
         "operationId": "reset_password",
         "requestBody": {
           "content": {

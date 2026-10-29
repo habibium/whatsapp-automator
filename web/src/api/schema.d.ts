@@ -57,8 +57,9 @@ export interface paths {
         put?: never;
         /**
          * Reset password
-         * @description Spends the token from a reset email and sets the new password. Every session and every other
-         *     emailed link of the account stops working, so the user signs in again everywhere.
+         * @description Spends the token from a reset email and sets the new password. Every session, sign-in waiting
+         *     for a second factor and other emailed link of the account stops working, so the user signs in
+         *     again everywhere.
          */
         post: operations["reset_password"];
         delete?: never;

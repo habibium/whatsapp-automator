@@ -238,8 +238,9 @@ pub async fn forgot_password(
 
 /// Reset password
 ///
-/// Spends the token from a reset email and sets the new password. Every session and every other
-/// emailed link of the account stops working, so the user signs in again everywhere.
+/// Spends the token from a reset email and sets the new password. Every session, sign-in waiting
+/// for a second factor and other emailed link of the account stops working, so the user signs in
+/// again everywhere.
 #[utoipa::path(post, path = "/reset-password", request_body = PasswordReset, responses(
     (status = OK, body = UserResponse),
     (status = BAD_REQUEST, description = "Invalid password, or the link is malformed, expired or already used", body = ErrorBody),
@@ -258,6 +259,7 @@ pub async fn reset_password(
     let user = db::users::set_password(&mut *tx, user_id, &password_hash).await?;
     db::sessions::delete_for_user(&mut *tx, user.id).await?;
     db::tokens::delete_all_for_user(&mut *tx, user.id).await?;
+    db::two_factor::delete_challenges_for_user(&mut *tx, user.id).await?;
     tx.commit().await?;
 
     let alert = templates::security_alert(SecurityEvent::PasswordChanged, &state.app_url)?;

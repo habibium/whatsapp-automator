@@ -191,6 +191,20 @@ pub async fn record_failed_attempt(
     .await
 }
 
+pub async fn delete_challenges_for_user(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM two_factor_challenges WHERE user_id = $1",
+        user_id
+    )
+    .execute(db)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn delete_challenge(db: impl PgExecutor<'_>, token_hash: &[u8]) -> sqlx::Result<()> {
     sqlx::query!(
         "DELETE FROM two_factor_challenges WHERE token_hash = $1",
