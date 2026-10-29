@@ -71,6 +71,7 @@ Environment variables, or a `.env` file in development (see `.env.example`):
 | `APP_URL`      | required in release builds; `http://localhost:5173` in debug builds | Public URL of the app. Links in emails point here, and an `https` URL makes the cookies `Secure` |
 | `SMTP_URL`     | required when `APP_URL` is `https`                                  | SMTP server for verification and password reset emails, e.g. `smtps://user:password@host:465`    |
 | `EMAIL_FROM`   | required with SMTP                                                  | Sender, e.g. `WhatsApp Automator <no-reply@example.com>`                                         |
+| `CLIENT_IP_HEADER` | unset                                                           | Header a trusted proxy sets to the client's address, e.g. `CF-Connecting-IP` behind Cloudflare. Unset, rate limits key on the peer address. `X-Forwarded-For` and `Forwarded` are refused |
 
 Migrations in `server/migrations` are embedded in the binary and applied at startup.
 
@@ -79,3 +80,7 @@ Without `SMTP_URL` the server writes each email, link included, to its log, whic
 ## Accounts
 
 Sign-up takes an email address and a password. The account cannot sign in until the address is verified through the emailed link, which works for 24 hours. Opened in the browser that signed up, the link also signs the user in; anywhere else it only verifies the address, so a link opened in someone else's browser cannot sign them into the wrong account. Password reset links work once, for an hour, and end every session and outstanding link of the account. Sessions last 30 days and extend while in use; the browser holds them in an `HttpOnly` cookie, and the database stores only a SHA-256 hash of each session and link token.
+
+Writes under `/api/auth` are rate-limited per client address: a burst of 20, then one every 6 seconds, with IPv6 addresses counted per /64. Sign-in attempts are also limited per account and password re-checks per user, however many addresses they come from: 10, then one every 90 seconds. A refused request gets a 429 with `Retry-After`. The limits live in memory, so they are per instance and reset on restart. Behind a proxy, set `CLIENT_IP_HEADER`, or every client shares the proxy's address; the server trusts that header as sent, so it must only be reachable through the proxy.
+
+Sign-up and password reset refuse passwords listed in Have I Been Pwned's [Pwned Passwords](https://haveibeenpwned.com/API/v3#PwnedPasswords). Only the first 5 characters of the password's SHA-1 hash leave the server. When the service does not answer within 3 seconds, the password is accepted and a warning logged.
