@@ -14,6 +14,8 @@ use crate::{crypto::Cipher, db, error::AppError};
 
 /// How long a sign-in whose password checked out waits for its second factor
 pub const CHALLENGE_TTL: TimeDelta = TimeDelta::minutes(5);
+/// How long a new key waits for the first code that turns two-step verification on
+pub const SETUP_TTL: TimeDelta = TimeDelta::minutes(15);
 /// Wrong codes a sign-in may try before it starts over from the password
 pub const MAX_ATTEMPTS: i16 = 5;
 

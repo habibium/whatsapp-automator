@@ -1075,7 +1075,7 @@
             }
           },
           "409": {
-            "description": "Already on, or the setup was never started",
+            "description": "Already on, or no setup is waiting: it was never started or has expired",
             "content": {
               "application/json": {
                 "schema": {
@@ -1169,7 +1169,7 @@
     "/api/auth/two-factor/setup": {
       "post": {
         "summary": "Start setting up two-step verification",
-        "description": "Checks the password, then creates a key for an authenticator app. Signing in does not ask for\ncodes until `POST /two-factor/enable` confirms the app shows the right one. Starting again\nreplaces a key that was never confirmed.",
+        "description": "Checks the password, then creates a key for an authenticator app. Signing in does not ask for\ncodes until `POST /two-factor/enable` confirms the app shows the right one, which it has 15\nminutes to do. Starting again replaces a key that was never confirmed.",
         "operationId": "setup_two_factor",
         "requestBody": {
           "content": {

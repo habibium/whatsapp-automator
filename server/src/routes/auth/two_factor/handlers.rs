@@ -53,8 +53,8 @@ pub async fn get_two_factor(
 /// Start setting up two-step verification
 ///
 /// Checks the password, then creates a key for an authenticator app. Signing in does not ask for
-/// codes until `POST /two-factor/enable` confirms the app shows the right one. Starting again
-/// replaces a key that was never confirmed.
+/// codes until `POST /two-factor/enable` confirms the app shows the right one, which it has 15
+/// minutes to do. Starting again replaces a key that was never confirmed.
 #[utoipa::path(post, path = "/two-factor/setup", request_body = PasswordConfirmation, responses(
     (status = OK, body = TwoFactorSetup),
     (status = BAD_REQUEST, description = "The password is incorrect", body = ErrorBody),
@@ -99,7 +99,7 @@ pub async fn setup_two_factor(
     (status = OK, body = RecoveryCodes, headers(("set-cookie" = String, description = "A new session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong", body = ErrorBody),
     (status = UNAUTHORIZED, body = ErrorBody),
-    (status = CONFLICT, description = "Already on, or the setup was never started", body = ErrorBody),
+    (status = CONFLICT, description = "Already on, or no setup is waiting: it was never started or has expired", body = ErrorBody),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn enable_two_factor(
@@ -113,14 +113,13 @@ pub async fn enable_two_factor(
     // Changes to this account and its sign-ins take turns, so none slips in between the sign-out
     // below and the commit
     db::users::lock(&mut *tx, user.id).await?;
-    let pending = match db::two_factor::find_secret(&mut *tx, user.id).await? {
-        Some(secret) if secret.enabled => {
-            return Err(AppError::Conflict("Two-step verification is already on"));
-        }
-        Some(secret) => secret,
-        None => return Err(AppError::Conflict("Start the setup first")),
-    };
-    let key = two_factor::open(&state.cipher, user.id, &pending.sealed)?;
+    if db::two_factor::is_enabled(&mut *tx, user.id).await? {
+        return Err(AppError::Conflict("Two-step verification is already on"));
+    }
+    let sealed = db::two_factor::find_pending(&mut *tx, user.id, two_factor::SETUP_TTL)
+        .await?
+        .ok_or(AppError::Conflict("Start the setup first"))?;
+    let key = two_factor::open(&state.cipher, user.id, &sealed)?;
     let totp = two_factor::totp(&key, &user.email)?;
     let step = two_factor::verify_code(&totp, &payload.code, None)
         .ok_or(AppError::IncorrectCode("code"))?;

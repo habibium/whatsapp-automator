@@ -399,8 +399,8 @@ export interface paths {
         /**
          * Start setting up two-step verification
          * @description Checks the password, then creates a key for an authenticator app. Signing in does not ask for
-         *     codes until `POST /two-factor/enable` confirms the app shows the right one. Starting again
-         *     replaces a key that was never confirmed.
+         *     codes until `POST /two-factor/enable` confirms the app shows the right one, which it has 15
+         *     minutes to do. Starting again replaces a key that was never confirmed.
          */
         post: operations["setup_two_factor"];
         delete?: never;
@@ -1438,7 +1438,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Already on, or the setup was never started */
+            /** @description Already on, or no setup is waiting: it was never started or has expired */
             409: {
                 headers: {
                     [name: string]: unknown;

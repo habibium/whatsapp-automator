@@ -75,6 +75,22 @@ pub async fn find_secret(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result
     .await
 }
 
+/// The sealed key of a setup started less than `ttl` ago that no code has confirmed yet
+pub async fn find_pending(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    ttl: TimeDelta,
+) -> sqlx::Result<Option<Vec<u8>>> {
+    sqlx::query_scalar!(
+        "SELECT secret FROM totp_secrets \
+         WHERE user_id = $1 AND enabled_at IS NULL AND created_at > $2",
+        user_id,
+        Utc::now() - ttl
+    )
+    .fetch_optional(db)
+    .await
+}
+
 /// `step` is the confirming code's, so that code cannot sign in afterwards
 pub async fn enable(db: impl PgExecutor<'_>, user_id: Uuid, step: i64) -> sqlx::Result<()> {
     sqlx::query!(
