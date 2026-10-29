@@ -9,7 +9,10 @@ use sqlx::PgPool;
 use totp_rs::{Secret, Totp};
 use uuid::Uuid;
 
-use super::{PASSWORD, TestApp, TestResponse};
+use super::{
+    PASSWORD, TestApp, TestResponse,
+    rate_limit::{TOO_MANY, retry_after},
+};
 use crate::auth::{
     password,
     token::{self, Purpose, Token},
@@ -358,6 +361,54 @@ async fn five_wrong_codes_end_the_sign_in(pool: PgPool) {
         )
         .await;
     assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[sqlx::test]
+async fn codes_are_limited_per_account_across_sign_ins(pool: PgPool) {
+    let enrolled = TestApp::new(pool.clone()).enroll(EMAIL).await;
+    let app = TestApp::new(pool);
+    let grace = app.enroll("grace@example.com").await;
+    let wrong = json!({ "code": wrong_code(&enrolled.totp) });
+
+    // Five codes in all, none of them enough to end either sign-in
+    let (first, second) = (app.challenge(EMAIL).await, app.challenge(EMAIL).await);
+    for (challenge, times) in [(&first, 3), (&second, 2)] {
+        for _ in 0..times {
+            let attempt = app.second_factor(wrong.clone(), challenge).await;
+            assert_eq!(attempt.status, StatusCode::BAD_REQUEST);
+        }
+    }
+
+    for body in [
+        json!({ "code": code(&enrolled.totp, enrolled.step + 1) }),
+        json!({ "recovery_code": enrolled.recovery_codes[0] }),
+    ] {
+        let refused = app.second_factor(body, &second).await;
+        assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(refused.body["error"], TOO_MANY);
+        // One code comes back every 30 minutes
+        assert!((1..=30 * 60).contains(&retry_after(&refused)));
+    }
+    let refused = app.second_factor(wrong, &first).await;
+    assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
+
+    // Refused before any code was checked, so neither sign-in lost an attempt to them
+    let attempts: Vec<i16> = sqlx::query_scalar(
+        "SELECT attempts FROM two_factor_challenges WHERE user_id = $1 ORDER BY attempts",
+    )
+    .bind(enrolled.user_id)
+    .fetch_all(&app.pool)
+    .await
+    .unwrap();
+    assert_eq!(attempts, [2, 3]);
+
+    let other_account = app
+        .second_factor(
+            json!({ "code": code(&grace.totp, grace.step + 1) }),
+            &app.challenge("grace@example.com").await,
+        )
+        .await;
+    assert_eq!(other_account.status, StatusCode::OK);
 }
 
 #[sqlx::test]

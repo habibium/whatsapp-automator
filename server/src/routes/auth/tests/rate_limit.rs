@@ -14,7 +14,7 @@ use crate::rate_limit::ClientIpHeader;
 
 /// Writes a client may make at once before the limit refuses one
 const BURST: usize = 20;
-const TOO_MANY: &str = "Too many attempts, try again later";
+pub(super) const TOO_MANY: &str = "Too many attempts, try again later";
 
 /// As `axum::serve` sees a request arriving from `peer`
 fn from_peer(mut request: Request<Body>, peer: &str) -> Request<Body> {
@@ -45,7 +45,7 @@ async fn signin(app: &TestApp, peer: &str, email: &str, password: &str) -> TestR
     app.send(from_peer(request, peer)).await
 }
 
-fn retry_after(response: &TestResponse) -> u64 {
+pub(super) fn retry_after(response: &TestResponse) -> u64 {
     response.headers[header::RETRY_AFTER]
         .to_str()
         .unwrap()
