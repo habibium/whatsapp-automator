@@ -3,13 +3,14 @@ use std::sync::Arc;
 use sqlx::PgPool;
 use url::Url;
 
-use crate::email::Mailer;
+use crate::{crypto::Cipher, email::Mailer};
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
     pub mailer: Mailer,
     pub app_url: Arc<Url>,
+    pub cipher: Cipher,
 }
 
 impl AppState {

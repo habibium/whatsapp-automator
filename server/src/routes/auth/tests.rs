@@ -17,6 +17,7 @@ use crate::{
         password, session,
         token::{Purpose, Token},
     },
+    crypto::Cipher,
     db,
     email::Mailer,
     state::AppState,
@@ -64,6 +65,7 @@ impl TestApp {
             pool: pool.clone(),
             mailer: Mailer::Log,
             app_url: Arc::new(Url::parse(app_url).unwrap()),
+            cipher: Cipher::new(&[0; 32]),
         };
         let (router, _) = crate::router();
 
