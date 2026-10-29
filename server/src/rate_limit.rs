@@ -203,3 +203,20 @@ where
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use uuid::Uuid;
+
+    use super::RateLimits;
+
+    #[test]
+    fn the_wrong_codes_alert_goes_out_once_a_window_per_user() {
+        let limits = RateLimits::default();
+        let (ada, grace) = (Uuid::new_v4(), Uuid::new_v4());
+
+        assert!(limits.wrong_codes_alert(ada));
+        assert!(!limits.wrong_codes_alert(ada));
+        assert!(limits.wrong_codes_alert(grace));
+    }
+}

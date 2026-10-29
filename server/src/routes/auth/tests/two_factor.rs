@@ -341,6 +341,12 @@ async fn five_wrong_codes_end_the_sign_in(pool: PgPool) {
     }
     let fifth = app.second_factor(wrong, &challenge).await;
     assert_eq!(fifth.status, StatusCode::UNAUTHORIZED);
+    let alerts: Vec<_> = app
+        .emails_to(EMAIL)
+        .into_iter()
+        .map(|(subject, _)| subject)
+        .collect();
+    assert_eq!(alerts, ["Someone entered your password"]);
 
     let challenges = "SELECT count(*) FROM two_factor_challenges WHERE user_id = $1";
     assert_eq!(app.count(challenges, enrolled.user_id).await, 0);
