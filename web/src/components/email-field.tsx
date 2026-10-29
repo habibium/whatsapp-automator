@@ -5,8 +5,11 @@ interface EmailFieldProps {
   onChange: (value: string) => void
   onBlur: () => void
   htmlName: string
-  /** `username` on sign-in, so password managers pair it with the saved password. */
-  autoComplete?: 'email' | 'username'
+  /**
+   * `username` on sign-in, so password managers pair it with the saved password; `webauthn` also
+   * offers passkeys in its autofill.
+   */
+  autoComplete?: 'email' | 'username' | 'username webauthn'
   isInvalid?: boolean
   errorMessage?: string
 }
