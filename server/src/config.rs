@@ -1,6 +1,7 @@
 use std::{env, path::PathBuf};
 
 use anyhow::Context;
+use axum::http::HeaderName;
 use lettre::message::Mailbox;
 use url::Url;
 
@@ -13,13 +14,16 @@ pub struct Config {
     /// `None` writes emails to the log instead of sending them
     pub smtp_url: Option<String>,
     pub email_from: Mailbox,
+    /// Header a trusted proxy sets to the client's address, such as `CF-Connecting-IP`; `None`
+    /// keys the rate limit on the peer address
+    pub client_ip_header: Option<HeaderName>,
 }
 
 impl Config {
     /// # Errors
     /// `DATABASE_URL` missing, `APP_URL` missing from a release build, `PORT` or `APP_URL`
-    /// malformed, an https `APP_URL` without `SMTP_URL`, or `SMTP_URL` without a valid
-    /// `EMAIL_FROM`.
+    /// malformed, an https `APP_URL` without `SMTP_URL`, `SMTP_URL` without a valid
+    /// `EMAIL_FROM`, or a `CLIENT_IP_HEADER` that is malformed or one proxies append to.
     pub fn from_env() -> anyhow::Result<Self> {
         let port = match env::var("PORT") {
             Ok(value) => value.parse().context("PORT must be a valid port number")?,
@@ -53,6 +57,21 @@ impl Config {
             Err(_) => "WhatsApp Automator <no-reply@localhost>".parse()?,
         };
 
+        let client_ip_header = match env::var("CLIENT_IP_HEADER") {
+            Ok(name) if !name.is_empty() => {
+                Some(HeaderName::try_from(name).context("CLIENT_IP_HEADER must be a header name")?)
+            }
+            _ => None,
+        };
+        // A proxy appends to these rather than replacing them, so their first value is the client's
+        // own claim
+        anyhow::ensure!(
+            !client_ip_header
+                .as_ref()
+                .is_some_and(|name| name == "x-forwarded-for" || name == "forwarded"),
+            "CLIENT_IP_HEADER must be a header the proxy overwrites, such as CF-Connecting-IP"
+        );
+
         Ok(Self {
             database_url: env::var("DATABASE_URL").context("DATABASE_URL is required")?,
             port,
@@ -61,6 +80,7 @@ impl Config {
             app_url,
             smtp_url,
             email_from,
+            client_ip_header,
         })
     }
 }

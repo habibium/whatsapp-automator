@@ -13,8 +13,8 @@ use axum::{Router, middleware, routing::any};
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 
-pub use crate::db::spawn_cleanup;
 use crate::state::AppState;
+pub use crate::{db::spawn_cleanup, rate_limit::ClientIpHeader};
 
 #[derive(OpenApi)]
 #[openapi(info(title = "whatsapp-automator"))]

@@ -4,12 +4,12 @@ use std::{
 };
 
 use axum::{
-    Router,
+    Extension, Router,
     extract::Request,
     http::{HeaderValue, header},
     response::Response,
 };
-use server::{config::Config, email::Mailer, state::AppState};
+use server::{ClientIpHeader, config::Config, email::Mailer, state::AppState};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_http::{
@@ -95,6 +95,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state)
         .merge(Scalar::with_url("/api/docs", api))
         .nest_service("/assets", assets_router)
+        .layer(Extension(ClientIpHeader(config.client_ip_header)))
         .layer(
             CompressionLayer::new()
                 .br(true)

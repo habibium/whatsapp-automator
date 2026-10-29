@@ -6,7 +6,7 @@ use std::{
 use axum::{
     body::Body,
     extract::ConnectInfo,
-    http::{Method, Request, Response},
+    http::{HeaderName, Method, Request, Response},
     response::IntoResponse,
 };
 use governor::middleware::NoOpMiddleware;
@@ -45,6 +45,12 @@ fn too_many_requests(error: GovernorError) -> Response<Body> {
     }
 }
 
+/// Names the header a trusted proxy sets to the client's address. Added as a request extension,
+/// since the rate limit runs before handlers and cannot read `AppState`.
+#[derive(Clone)]
+pub struct ClientIpHeader(pub Option<HeaderName>);
+
+/// The address in the [`ClientIpHeader`] when one is named and present, else the peer address
 #[derive(Clone, Copy)]
 pub struct ClientIp;
 
@@ -56,13 +62,21 @@ impl KeyExtractor for ClientIp {
     }
 
     fn extract<T>(&self, request: &Request<T>) -> Result<Self::Key, GovernorError> {
-        let peer = request
-            .extensions()
-            .get::<ConnectInfo<SocketAddr>>()
-            .map(|ConnectInfo(addr)| addr.ip());
+        let extensions = request.extensions();
+        let forwarded = extensions
+            .get::<ClientIpHeader>()
+            .and_then(|ClientIpHeader(name)| request.headers().get(name.as_ref()?))
+            .and_then(|value| value.to_str().ok()?.trim().parse().ok());
+        let peer = || {
+            extensions
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|ConnectInfo(addr)| addr.ip())
+        };
 
         // Only requests that skip `main`, as tests do, lack a peer address; they share one key
-        Ok(peer.map_or(IpAddr::V6(Ipv6Addr::UNSPECIFIED), key))
+        Ok(forwarded
+            .or_else(peer)
+            .map_or(IpAddr::V6(Ipv6Addr::UNSPECIFIED), key))
     }
 
     fn key_name(&self, key: &Self::Key) -> Option<String> {
