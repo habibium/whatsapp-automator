@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0-alpha.5] - 2026-10-29
+
+### Features
+
+- Expose application version in Vite config and update footer to display version (d66fb25)
+- **server:** Add email verification, sign-in and password reset (7d6f0aa)
+- **web:** Add sign-in, email verification and password reset pages (ca20bf3)
+
+### Documentation
+
+- Document auth configuration and account behaviour (0aaf152)
+
+### Maintenance
+
+- Run server tests against Postgres (f0c7584)
 ## [0.1.0-alpha.4] - 2026-09-28
 
 ### Features
