@@ -99,7 +99,9 @@ export interface paths {
         put?: never;
         /**
          * Sign in
-         * @description Starts a session for a verified account and sets it as an `HttpOnly` cookie.
+         * @description Starts a session for a verified account and sets it as an `HttpOnly` cookie. With two-step
+         *     verification on, answers `two_factor_required` instead and sets a cookie that
+         *     `POST /signin/two-factor` needs within five minutes to finish the sign-in.
          */
         post: operations["signin"];
         delete?: never;
@@ -384,6 +386,18 @@ export interface components {
             email: string;
             password: string;
         };
+        /**
+         * @description With two-step verification on, the password only starts the sign-in, and
+         *     `POST /signin/two-factor` finishes it
+         */
+        SignInResponse: {
+            /** @enum {string} */
+            status: "signed_in";
+            user: components["schemas"]["UserResponse"];
+        } | {
+            /** @enum {string} */
+            status: "two_factor_required";
+        };
         /** @description What an authenticator app needs to start showing codes for the account */
         TwoFactorSetup: {
             /** @description Adds the account to an app that opens `otpauth://` links */
@@ -577,12 +591,12 @@ export interface operations {
         responses: {
             200: {
                 headers: {
-                    /** @description The session cookie */
+                    /** @description The session cookie, or the one that carries the sign-in to its second factor */
                     "set-cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserResponse"];
+                    "application/json": components["schemas"]["SignInResponse"];
                 };
             };
             400: {

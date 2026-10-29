@@ -174,7 +174,7 @@
     "/api/auth/signin": {
       "post": {
         "summary": "Sign in",
-        "description": "Starts a session for a verified account and sets it as an `HttpOnly` cookie.",
+        "description": "Starts a session for a verified account and sets it as an `HttpOnly` cookie. With two-step\nverification on, answers `two_factor_required` instead and sets a cookie that\n`POST /signin/two-factor` needs within five minutes to finish the sign-in.",
         "operationId": "signin",
         "requestBody": {
           "content": {
@@ -194,13 +194,13 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "The session cookie"
+                "description": "The session cookie, or the one that carries the sign-in to its second factor"
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
+                  "$ref": "#/components/schemas/SignInResponse"
                 }
               }
             }
@@ -1016,6 +1016,43 @@
             "type": "string"
           }
         }
+      },
+      "SignInResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "user",
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "signed_in"
+                ]
+              },
+              "user": {
+                "$ref": "#/components/schemas/UserResponse"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "two_factor_required"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "With two-step verification on, the password only starts the sign-in, and\n`POST /signin/two-factor` finishes it"
       },
       "TwoFactorSetup": {
         "type": "object",

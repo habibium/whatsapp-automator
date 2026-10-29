@@ -1,3 +1,4 @@
+use chrono::{TimeDelta, Utc};
 use sqlx::{PgConnection, PgExecutor};
 use uuid::Uuid;
 
@@ -25,6 +26,17 @@ pub async fn status(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<Stat
             (
                 SELECT count(*) FROM recovery_codes WHERE user_id = $1 AND used_at IS NULL
             ) AS "recovery_codes_remaining!""#,
+        user_id
+    )
+    .fetch_one(db)
+    .await
+}
+
+pub async fn is_enabled(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<bool> {
+    sqlx::query_scalar!(
+        r#"SELECT EXISTS (
+            SELECT 1 FROM totp_secrets WHERE user_id = $1 AND enabled_at IS NOT NULL
+        ) AS "exists!""#,
         user_id
     )
     .fetch_one(db)
@@ -159,6 +171,29 @@ pub async fn replace_recovery_codes(
     .await?;
 
     Ok(())
+}
+
+/// Inserts the challenge only while `password_hash` is still the user's password, for the reason
+/// `sessions::insert_if_password` gives
+pub async fn insert_challenge_if_password(
+    db: impl PgExecutor<'_>,
+    token_hash: &[u8],
+    user_id: Uuid,
+    password_hash: &str,
+    ttl: TimeDelta,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "INSERT INTO two_factor_challenges (token_hash, user_id, expires_at) \
+         SELECT $1, id, $3 FROM users WHERE id = $2 AND password = $4 FOR SHARE",
+        token_hash,
+        user_id,
+        Utc::now() + ttl,
+        password_hash
+    )
+    .execute(db)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
 }
 
 /// The user whose sign-in the challenge holds, or `None` when it is unknown, expired or used up

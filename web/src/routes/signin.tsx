@@ -19,7 +19,9 @@ import { api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
 import { EmailField } from '@/components/email-field'
 import { PasswordField } from '@/components/password-field'
+import { TwoFactorSignIn } from '@/components/two-factor-sign-in'
 import type { Notice } from '@/lib/notice'
+import type { User } from '@/lib/session'
 
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
 import {
@@ -53,6 +55,7 @@ const fieldNames = ['email', 'password'] as const
 type Problem =
   | { kind: 'credentials' }
   | { kind: 'unverified'; email: string; isResent: boolean }
+  | { kind: 'two-factor-ended' }
   | { kind: 'unexpected' }
 
 function SignIn() {
@@ -62,6 +65,12 @@ function SignIn() {
   const notice = useLocation({ select: (location) => location.state.notice })
   const knownEmail = useLocation({ select: (location) => location.state.email })
   const [problem, setProblem] = useState<Problem | null>(null)
+  const [isSecondStep, setIsSecondStep] = useState(false)
+
+  const finishSignIn = async (user: User) => {
+    setSessionUser(queryClient, user)
+    await navigate({ href: safeRedirect(search.redirect), replace: true })
+  }
 
   const form = useForm({
     defaultValues: { email: knownEmail ?? '', password: '' },
@@ -77,9 +86,12 @@ function SignIn() {
         const { data, error, response } = await api.POST('/api/auth/signin', {
           body: { email, password: value.password },
         })
+        if (data?.status === 'two_factor_required') {
+          setIsSecondStep(true)
+          return
+        }
         if (data) {
-          setSessionUser(queryClient, data)
-          await navigate({ href: safeRedirect(search.redirect), replace: true })
+          await finishSignIn(data.user)
           return
         }
         if (response.status === 401) {
@@ -110,6 +122,19 @@ function SignIn() {
     } catch {
       setProblem({ kind: 'unexpected' })
     }
+  }
+
+  if (isSecondStep) {
+    return (
+      <TwoFactorSignIn
+        onSignedIn={finishSignIn}
+        onEnded={() => {
+          setIsSecondStep(false)
+          setProblem({ kind: 'two-factor-ended' })
+        }}
+        onCancel={() => setIsSecondStep(false)}
+      />
+    )
   }
 
   return (
@@ -274,6 +299,14 @@ function ProblemBanner({ problem, onResend }: ProblemBannerProps) {
               clickAction={() => onResend(problem.email)}
             />
           }
+        />
+      )
+    case 'two-factor-ended':
+      return (
+        <Banner
+          status="warning"
+          title="Sign in again."
+          description="The code step ends after five wrong codes or five minutes."
         />
       )
     case 'unexpected':

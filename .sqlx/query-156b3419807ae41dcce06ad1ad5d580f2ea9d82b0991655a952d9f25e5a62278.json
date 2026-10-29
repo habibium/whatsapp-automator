@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO two_factor_challenges (token_hash, user_id, expires_at) SELECT $1, id, $3 FROM users WHERE id = $2 AND password = $4 FOR SHARE",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "156b3419807ae41dcce06ad1ad5d580f2ea9d82b0991655a952d9f25e5a62278"
+}

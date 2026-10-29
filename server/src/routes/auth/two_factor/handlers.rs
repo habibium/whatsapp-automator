@@ -191,7 +191,7 @@ pub async fn regenerate_recovery_codes(
     let mut tx = state.pool.begin().await?;
     // Otherwise a concurrent disable could commit in between, and new codes would outlive it
     db::users::lock(&mut *tx, user.id).await?;
-    if !db::two_factor::status(&mut *tx, user.id).await?.enabled {
+    if !db::two_factor::is_enabled(&mut *tx, user.id).await? {
         return Err(AppError::Conflict("Two-step verification is off"));
     }
     let recovery_codes = replace_recovery_codes(&mut tx, user.id).await?;

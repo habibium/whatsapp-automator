@@ -1,13 +1,16 @@
+use axum_extra::extract::cookie::CookieJar;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use chrono::TimeDelta;
 use qrcode::{QrCode, render::svg};
 use sha2::{Digest, Sha256};
+use sqlx::PgExecutor;
 use subtle::ConstantTimeEq;
 use totp_rs::{Algorithm, Builder, Totp};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
-use crate::crypto::Cipher;
+use super::{cookie, token::Token};
+use crate::{crypto::Cipher, db, error::AppError};
 
 /// How long a sign-in whose password checked out waits for its second factor
 pub const CHALLENGE_TTL: TimeDelta = TimeDelta::minutes(5);
@@ -139,6 +142,29 @@ pub fn find_recovery_code<'a>(
             found
         }
     })
+}
+
+/// Holds a sign-in whose password checked out until a second factor finishes it, and adds its
+/// cookie to `jar`. Like `session::start_with_password`, returns `None` when a reset replaced the
+/// password meanwhile.
+pub async fn start_challenge(
+    db: impl PgExecutor<'_>,
+    jar: CookieJar,
+    user_id: Uuid,
+    password_hash: &str,
+    secure: bool,
+) -> Result<Option<CookieJar>, AppError> {
+    let token = Token::generate()?;
+    let started = db::two_factor::insert_challenge_if_password(
+        db,
+        &token.hash,
+        user_id,
+        password_hash,
+        CHALLENGE_TTL,
+    )
+    .await?;
+
+    Ok(started.then(|| cookie::TWO_FACTOR.set(jar, token.value, secure)))
 }
 
 #[cfg(test)]
