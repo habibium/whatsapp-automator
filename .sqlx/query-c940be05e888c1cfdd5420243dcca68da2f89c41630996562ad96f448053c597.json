@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE totp_secrets SET          wrong_codes = CASE WHEN wrong_codes_since > $2 THEN wrong_codes + 1 ELSE 1 END,          wrong_codes_since = CASE WHEN wrong_codes_since > $2 THEN wrong_codes_since ELSE now() END          WHERE user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c940be05e888c1cfdd5420243dcca68da2f89c41630996562ad96f448053c597"
+}

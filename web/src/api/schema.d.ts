@@ -250,8 +250,9 @@ export interface paths {
          * @description Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
          *     the authenticator app or a recovery code. Each code works once. After five wrong codes the
          *     sign-in ends and has to start over from the password, and the owner is emailed, at most once
-         *     every 6 hours. An account gets five codes checked, then one every 30 minutes, however many
-         *     sign-ins they are spread over. A sign-in with a recovery code emails the owner too.
+         *     every 6 hours. An account takes 30 wrong codes a day, however many sign-ins they are spread
+         *     over; a right code or a password reset clears the count. A sign-in with a recovery code emails
+         *     the owner too.
          */
         post: operations["verify_two_factor"];
         delete?: never;
@@ -358,8 +359,7 @@ export interface paths {
          *     for a code too. Returns ten recovery codes, each good for one sign-in without the app. Every
          *     session of the account ends, this one included, and this browser gets a new one, so a session
          *     someone else may already hold does not outlast the change. After five wrong codes the pending
-         *     key is deleted and the setup has to start again. Codes here count toward the account's limit
-         *     on codes at sign-in.
+         *     key is deleted and the setup has to start again.
          */
         post: operations["enable_two_factor"];
         delete?: never;
@@ -1449,7 +1449,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Too many writes from this client, or codes tried for this account */
+            /** @description Too many writes from this client */
             429: {
                 headers: {
                     /** @description Seconds until another attempt is allowed */

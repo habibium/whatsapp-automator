@@ -6,6 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use axum_extra::extract::cookie::CookieJar;
+use chrono::Utc;
 use sqlx::PgConnection;
 use uuid::Uuid;
 
@@ -100,14 +101,13 @@ pub async fn setup_two_factor(
 /// for a code too. Returns ten recovery codes, each good for one sign-in without the app. Every
 /// session of the account ends, this one included, and this browser gets a new one, so a session
 /// someone else may already hold does not outlast the change. After five wrong codes the pending
-/// key is deleted and the setup has to start again. Codes here count toward the account's limit
-/// on codes at sign-in.
+/// key is deleted and the setup has to start again.
 #[utoipa::path(post, path = "/two-factor/enable", request_body = AuthenticatorCode, responses(
     (status = OK, body = RecoveryCodes, headers(("set-cookie" = String, description = "A new session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong", body = ErrorBody),
     (status = UNAUTHORIZED, body = ErrorBody),
     (status = CONFLICT, description = "Already on, or no setup is waiting: it was never started, has expired or took five wrong codes", body = ErrorBody),
-    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client, or codes tried for this account", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn enable_two_factor(
@@ -127,7 +127,6 @@ pub async fn enable_two_factor(
     let sealed = db::two_factor::find_pending(&mut *tx, user.id, two_factor::SETUP_TTL)
         .await?
         .ok_or(AppError::Conflict("Start the setup first"))?;
-    state.rate_limits.second_factor(user.id)?;
     let key = two_factor::open(&state.cipher, user.id, &sealed)?;
     let totp = two_factor::totp(&key, &user.email)?;
     let Some(step) = two_factor::verify_code(&totp, &payload.code, None) else {
@@ -228,8 +227,9 @@ pub async fn regenerate_recovery_codes(
 /// Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from
 /// the authenticator app or a recovery code. Each code works once. After five wrong codes the
 /// sign-in ends and has to start over from the password, and the owner is emailed, at most once
-/// every 6 hours. An account gets five codes checked, then one every 30 minutes, however many
-/// sign-ins they are spread over. A sign-in with a recovery code emails the owner too.
+/// every 6 hours. An account takes 30 wrong codes a day, however many sign-ins they are spread
+/// over; a right code or a password reset clears the count. A sign-in with a recovery code emails
+/// the owner too.
 #[utoipa::path(post, path = "/signin/two-factor", request_body = SecondFactor, responses(
     (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "The session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong or was used already", body = ErrorBody),
@@ -252,8 +252,6 @@ pub async fn verify_two_factor(
     let owner = db::two_factor::find_challenge(&mut *tx, &token_hash)
         .await?
         .ok_or(AppError::SignInExpired)?;
-    // Per user rather than per challenge, since a new challenge costs only the password
-    state.rate_limits.second_factor(owner.id)?;
     // Attempts at this sign-in take turns. A password reset either commits first and takes the
     // challenge with it, hence the second read, or waits and then ends the session started here.
     db::users::lock(&mut *tx, owner.id).await?;
@@ -265,8 +263,21 @@ pub async fn verify_two_factor(
         .await?
         .filter(|secret| secret.enabled)
         .ok_or(AppError::SignInExpired)?;
+    // Per account rather than per challenge, since a new challenge costs only the password
+    let blocked = db::two_factor::wrong_codes_until(
+        &mut *tx,
+        user.id,
+        two_factor::WRONG_CODE_LIMIT,
+        two_factor::WRONG_CODE_WINDOW,
+    )
+    .await?;
+    if let Some(closes) = blocked {
+        let wait = (closes - Utc::now()).to_std().unwrap_or_default();
+        return Err(AppError::TooManyRequests(wait));
+    }
 
     if !spend(&mut tx, &state.cipher, &user, &secret, &payload).await? {
+        db::two_factor::record_wrong_code(&mut *tx, user.id, two_factor::WRONG_CODE_WINDOW).await?;
         let attempts = db::two_factor::record_failed_attempt(&mut *tx, &token_hash).await?;
         if attempts < two_factor::MAX_ATTEMPTS {
             // The request fails, but the attempt has to count
@@ -283,6 +294,7 @@ pub async fn verify_two_factor(
     }
 
     db::two_factor::delete_challenge(&mut *tx, &token_hash).await?;
+    db::two_factor::clear_wrong_codes(&mut *tx, user.id).await?;
     let recovery_codes_left = if matches!(payload, SecondFactor::RecoveryCode(_)) {
         Some(
             db::two_factor::status(&mut *tx, user.id)

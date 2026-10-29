@@ -289,6 +289,8 @@ pub async fn reset_password(
     db::sessions::delete_for_user(&mut *tx, user.id).await?;
     db::tokens::delete_all_for_user(&mut *tx, user.id).await?;
     db::two_factor::delete_challenges_for_user(&mut *tx, user.id).await?;
+    // Whoever spent them knew the old password, which no longer works
+    db::two_factor::clear_wrong_codes(&mut *tx, user.id).await?;
     tx.commit().await?;
 
     let alert = templates::security_alert(SecurityEvent::PasswordChanged, &state.app_url)?;

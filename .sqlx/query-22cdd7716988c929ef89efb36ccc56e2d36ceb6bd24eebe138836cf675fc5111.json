@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE totp_secrets SET wrong_codes = 0, wrong_codes_since = NULL WHERE user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "22cdd7716988c929ef89efb36ccc56e2d36ceb6bd24eebe138836cf675fc5111"
+}

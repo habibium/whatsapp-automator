@@ -1,4 +1,4 @@
-use chrono::{TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::{PgConnection, PgExecutor};
 use uuid::Uuid;
 
@@ -260,6 +260,56 @@ pub async fn find_challenge(
     )
     .fetch_optional(db)
     .await
+}
+
+/// When the account has had `limit` wrong sign-in codes in the `window` that is still open, the
+/// time that window closes
+pub async fn wrong_codes_until(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    limit: i16,
+    window: TimeDelta,
+) -> sqlx::Result<Option<DateTime<Utc>>> {
+    let row = sqlx::query!(
+        "SELECT wrong_codes, wrong_codes_since FROM totp_secrets WHERE user_id = $1",
+        user_id
+    )
+    .fetch_optional(db)
+    .await?;
+
+    Ok(row.and_then(|row| {
+        let closes = row.wrong_codes_since? + window;
+        (row.wrong_codes >= limit && closes > Utc::now()).then_some(closes)
+    }))
+}
+
+/// Counts a wrong sign-in code, opening a new window when the last one began `window` ago
+pub async fn record_wrong_code(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    window: TimeDelta,
+) -> sqlx::Result<()> {
+    let stale = Utc::now() - window;
+    sqlx::query!(
+        "UPDATE totp_secrets SET          wrong_codes = CASE WHEN wrong_codes_since > $2 THEN wrong_codes + 1 ELSE 1 END,          wrong_codes_since = CASE WHEN wrong_codes_since > $2 THEN wrong_codes_since ELSE now() END          WHERE user_id = $1",
+        user_id,
+        stale
+    )
+    .execute(db)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn clear_wrong_codes(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE totp_secrets SET wrong_codes = 0, wrong_codes_since = NULL WHERE user_id = $1",
+        user_id
+    )
+    .execute(db)
+    .await?;
+
+    Ok(())
 }
 
 /// Counts a wrong code against the challenge and returns how many it has had

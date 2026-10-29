@@ -706,7 +706,7 @@
     "/api/auth/signin/two-factor": {
       "post": {
         "summary": "Finish signing in",
-        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password, and the owner is emailed, at most once\nevery 6 hours. An account gets five codes checked, then one every 30 minutes, however many\nsign-ins they are spread over. A sign-in with a recovery code emails the owner too.",
+        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password, and the owner is emailed, at most once\nevery 6 hours. An account takes 30 wrong codes a day, however many sign-ins they are spread\nover; a right code or a password reset clears the count. A sign-in with a recovery code emails\nthe owner too.",
         "operationId": "verify_two_factor",
         "requestBody": {
           "content": {
@@ -1023,7 +1023,7 @@
     "/api/auth/two-factor/enable": {
       "post": {
         "summary": "Turn on two-step verification",
-        "description": "Confirms the pending key with a code from the authenticator app, after which signing in asks\nfor a code too. Returns ten recovery codes, each good for one sign-in without the app. Every\nsession of the account ends, this one included, and this browser gets a new one, so a session\nsomeone else may already hold does not outlast the change. After five wrong codes the pending\nkey is deleted and the setup has to start again. Codes here count toward the account's limit\non codes at sign-in.",
+        "description": "Confirms the pending key with a code from the authenticator app, after which signing in asks\nfor a code too. Returns ten recovery codes, each good for one sign-in without the app. Every\nsession of the account ends, this one included, and this browser gets a new one, so a session\nsomeone else may already hold does not outlast the change. After five wrong codes the pending\nkey is deleted and the setup has to start again.",
         "operationId": "enable_two_factor",
         "requestBody": {
           "content": {
@@ -1085,7 +1085,7 @@
             }
           },
           "429": {
-            "description": "Too many writes from this client, or codes tried for this account",
+            "description": "Too many writes from this client",
             "headers": {
               "retry-after": {
                 "schema": {

@@ -19,6 +19,10 @@ pub const SETUP_TTL: TimeDelta = TimeDelta::minutes(15);
 /// Wrong codes a sign-in may try before it starts over from the password, and a setup before it
 /// starts over from a new key
 pub const MAX_ATTEMPTS: i16 = 5;
+/// Wrong sign-in codes an account takes per window, however many sign-ins they spread over. Only
+/// successes and password resets clear the count, so a legitimate user never meets the cap.
+pub const WRONG_CODE_LIMIT: i16 = 30;
+pub const WRONG_CODE_WINDOW: TimeDelta = TimeDelta::days(1);
 
 /// The label authenticator apps show next to the account's codes
 const ISSUER: &str = "WhatsApp Automator";
