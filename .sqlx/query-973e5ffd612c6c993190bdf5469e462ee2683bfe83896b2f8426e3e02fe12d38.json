@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM totp_secrets WHERE user_id = $1 AND enabled_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "973e5ffd612c6c993190bdf5469e462ee2683bfe83896b2f8426e3e02fe12d38"
+}

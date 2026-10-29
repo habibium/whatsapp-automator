@@ -53,7 +53,8 @@ pub async fn save_pending(
     let result = sqlx::query!(
         "INSERT INTO totp_secrets (user_id, secret) VALUES ($1, $2) \
          ON CONFLICT (user_id) DO UPDATE \
-         SET secret = EXCLUDED.secret, last_used_step = NULL, created_at = now() \
+         SET secret = EXCLUDED.secret, last_used_step = NULL, setup_attempts = 0, \
+             created_at = now() \
          WHERE totp_secrets.enabled_at IS NULL",
         user_id,
         sealed_secret
@@ -89,6 +90,31 @@ pub async fn find_pending(
     )
     .fetch_optional(db)
     .await
+}
+
+/// Counts a wrong code against the pending setup and returns how many it has had
+pub async fn record_failed_setup_attempt(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+) -> sqlx::Result<i16> {
+    sqlx::query_scalar!(
+        "UPDATE totp_secrets SET setup_attempts = setup_attempts + 1 \
+         WHERE user_id = $1 AND enabled_at IS NULL RETURNING setup_attempts",
+        user_id
+    )
+    .fetch_one(db)
+    .await
+}
+
+pub async fn delete_pending(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM totp_secrets WHERE user_id = $1 AND enabled_at IS NULL",
+        user_id
+    )
+    .execute(db)
+    .await?;
+
+    Ok(())
 }
 
 /// `step` is the confirming code's, so that code cannot sign in afterwards

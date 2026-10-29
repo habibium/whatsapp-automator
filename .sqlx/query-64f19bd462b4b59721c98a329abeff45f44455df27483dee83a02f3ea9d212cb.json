@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE totp_secrets SET setup_attempts = setup_attempts + 1 WHERE user_id = $1 AND enabled_at IS NULL RETURNING setup_attempts",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "setup_attempts",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "totp_secrets",
+            "name": "setup_attempts"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "64f19bd462b4b59721c98a329abeff45f44455df27483dee83a02f3ea9d212cb"
+}

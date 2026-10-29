@@ -94,12 +94,13 @@ pub async fn setup_two_factor(
 /// Confirms the pending key with a code from the authenticator app, after which signing in asks
 /// for a code too. Returns ten recovery codes, each good for one sign-in without the app. Every
 /// session of the account ends, this one included, and this browser gets a new one, so a session
-/// someone else may already hold does not outlast the change.
+/// someone else may already hold does not outlast the change. After five wrong codes the pending
+/// key is deleted and the setup has to start again.
 #[utoipa::path(post, path = "/two-factor/enable", request_body = AuthenticatorCode, responses(
     (status = OK, body = RecoveryCodes, headers(("set-cookie" = String, description = "A new session cookie"))),
     (status = BAD_REQUEST, description = "The code is wrong", body = ErrorBody),
     (status = UNAUTHORIZED, body = ErrorBody),
-    (status = CONFLICT, description = "Already on, or no setup is waiting: it was never started or has expired", body = ErrorBody),
+    (status = CONFLICT, description = "Already on, or no setup is waiting: it was never started, has expired or took five wrong codes", body = ErrorBody),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn enable_two_factor(
@@ -121,8 +122,19 @@ pub async fn enable_two_factor(
         .ok_or(AppError::Conflict("Start the setup first"))?;
     let key = two_factor::open(&state.cipher, user.id, &sealed)?;
     let totp = two_factor::totp(&key, &user.email)?;
-    let step = two_factor::verify_code(&totp, &payload.code, None)
-        .ok_or(AppError::IncorrectCode("code"))?;
+    let Some(step) = two_factor::verify_code(&totp, &payload.code, None) else {
+        let attempts = db::two_factor::record_failed_setup_attempt(&mut *tx, user.id).await?;
+        if attempts < two_factor::MAX_ATTEMPTS {
+            // The request fails, but the attempt has to count
+            tx.commit().await?;
+            return Err(AppError::IncorrectCode("code"));
+        }
+        db::two_factor::delete_pending(&mut *tx, user.id).await?;
+        tx.commit().await?;
+        return Err(AppError::Conflict(
+            "Too many wrong codes; start the setup again",
+        ));
+    };
 
     db::two_factor::enable(&mut *tx, user.id, step).await?;
     let recovery_codes = replace_recovery_codes(&mut tx, user.id).await?;

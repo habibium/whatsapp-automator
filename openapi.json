@@ -1023,7 +1023,7 @@
     "/api/auth/two-factor/enable": {
       "post": {
         "summary": "Turn on two-step verification",
-        "description": "Confirms the pending key with a code from the authenticator app, after which signing in asks\nfor a code too. Returns ten recovery codes, each good for one sign-in without the app. Every\nsession of the account ends, this one included, and this browser gets a new one, so a session\nsomeone else may already hold does not outlast the change.",
+        "description": "Confirms the pending key with a code from the authenticator app, after which signing in asks\nfor a code too. Returns ten recovery codes, each good for one sign-in without the app. Every\nsession of the account ends, this one included, and this browser gets a new one, so a session\nsomeone else may already hold does not outlast the change. After five wrong codes the pending\nkey is deleted and the setup has to start again.",
         "operationId": "enable_two_factor",
         "requestBody": {
           "content": {
@@ -1075,7 +1075,7 @@
             }
           },
           "409": {
-            "description": "Already on, or no setup is waiting: it was never started or has expired",
+            "description": "Already on, or no setup is waiting: it was never started, has expired or took five wrong codes",
             "content": {
               "application/json": {
                 "schema": {

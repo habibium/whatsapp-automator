@@ -357,7 +357,8 @@ export interface paths {
          * @description Confirms the pending key with a code from the authenticator app, after which signing in asks
          *     for a code too. Returns ten recovery codes, each good for one sign-in without the app. Every
          *     session of the account ends, this one included, and this browser gets a new one, so a session
-         *     someone else may already hold does not outlast the change.
+         *     someone else may already hold does not outlast the change. After five wrong codes the pending
+         *     key is deleted and the setup has to start again.
          */
         post: operations["enable_two_factor"];
         delete?: never;
@@ -1438,7 +1439,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Already on, or no setup is waiting: it was never started or has expired */
+            /** @description Already on, or no setup is waiting: it was never started, has expired or took five wrong codes */
             409: {
                 headers: {
                     [name: string]: unknown;
