@@ -1,9 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute } from '@tanstack/react-router'
 import { Button } from '@astryxdesign/core/Button'
+import { Divider } from '@astryxdesign/core/Divider'
 import { Heading, Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 
+import { PasskeysSection } from '@/components/passkeys-section'
 import { SiteFrame } from '@/components/site-frame'
 import { HOME_HREF } from '@/lib/session'
 
@@ -32,6 +34,10 @@ function Settings() {
             messages, so a password alone shouldn't be enough.
           </Text>
         </VStack>
+
+        <Divider />
+
+        <PasskeysSection />
       </VStack>
     </SiteFrame>
   )

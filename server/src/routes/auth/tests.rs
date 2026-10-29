@@ -25,6 +25,7 @@ use crate::{
     state::AppState,
 };
 
+mod passkeys;
 mod pwned;
 mod rate_limit;
 

@@ -4,6 +4,7 @@ use crate::state::AppState;
 
 mod dto;
 mod handlers;
+mod passkeys;
 #[cfg(test)]
 mod tests;
 
@@ -17,4 +18,5 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::resend_verification))
         .routes(routes!(handlers::forgot_password))
         .routes(routes!(handlers::reset_password))
+        .merge(passkeys::router())
 }

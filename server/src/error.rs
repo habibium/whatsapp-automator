@@ -21,12 +21,16 @@ pub enum AppError {
     EmailNotVerified,
 
     /// The signed-in user's password, asked again before a sensitive change, did not match
-    #[expect(
-        dead_code,
-        reason = "constructed by `auth::reauth`, which has no caller yet"
-    )]
     #[error("Validation Failed")]
     IncorrectPassword,
+
+    /// A new passkey failed verification, or came back after its registration expired or finished
+    #[error("This passkey request is invalid or has expired")]
+    PasskeyRejected,
+
+    /// Unknown passkey, failed verification, or a sign-in that expired or already finished
+    #[error("This passkey could not sign you in")]
+    PasskeySignInFailed,
 
     #[error("This link is invalid or has expired")]
     InvalidToken,
@@ -76,7 +80,7 @@ impl IntoResponse for AppError {
         };
 
         let (status, message, details) = match self {
-            Self::Unauthorized | Self::InvalidCredentials => {
+            Self::Unauthorized | Self::InvalidCredentials | Self::PasskeySignInFailed => {
                 (StatusCode::UNAUTHORIZED, self.to_string(), None)
             }
 
@@ -119,7 +123,9 @@ impl IntoResponse for AppError {
 
             Self::Conflict(_) => (StatusCode::CONFLICT, self.to_string(), None),
 
-            Self::InvalidToken | Self::Json(_) => (StatusCode::BAD_REQUEST, self.to_string(), None),
+            Self::InvalidToken | Self::PasskeyRejected | Self::Json(_) => {
+                (StatusCode::BAD_REQUEST, self.to_string(), None)
+            }
 
             Self::Db(e) => {
                 tracing::error!(error = ?e, "database error");

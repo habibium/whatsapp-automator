@@ -18,8 +18,10 @@ import { z } from 'zod'
 import { api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
 import { EmailField } from '@/components/email-field'
+import { PasskeySignIn } from '@/components/passkey-sign-in'
 import { PasswordField } from '@/components/password-field'
 import type { Notice } from '@/lib/notice'
+import type { User } from '@/lib/session'
 
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
 import {
@@ -69,6 +71,11 @@ function SignIn() {
   const knownEmail = useLocation({ select: (location) => location.state.email })
   const [problem, setProblem] = useState<Problem | null>(null)
 
+  const finishSignIn = async (user: User) => {
+    setSessionUser(queryClient, user)
+    await navigate({ href: safeRedirect(search.redirect), replace: true })
+  }
+
   const form = useForm({
     defaultValues: { email: knownEmail ?? '', password: '' },
     validators: { onSubmit: signinSchema },
@@ -84,8 +91,7 @@ function SignIn() {
           body: { email, password: value.password },
         })
         if (data) {
-          setSessionUser(queryClient, data)
-          await navigate({ href: safeRedirect(search.redirect), replace: true })
+          await finishSignIn(data)
           return
         }
         if (response.status === 401) {
@@ -164,7 +170,7 @@ function SignIn() {
                 {(field) => (
                   <EmailField
                     htmlName={field.name}
-                    autoComplete="username"
+                    autoComplete="username webauthn"
                     value={field.state.value}
                     onChange={(value) => field.handleChange(value)}
                     onBlur={field.handleBlur}
@@ -228,6 +234,7 @@ function SignIn() {
           </form.Subscribe>
         </VStack>
       </form>
+      <PasskeySignIn onSignedIn={finishSignIn} />
     </AuthLayout>
   )
 }
