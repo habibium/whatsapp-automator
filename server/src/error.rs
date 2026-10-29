@@ -24,6 +24,10 @@ pub enum AppError {
     #[error("Validation Failed")]
     IncorrectPassword,
 
+    /// An authenticator or recovery code did not match; names the request field that held it
+    #[error("Validation Failed")]
+    IncorrectCode(&'static str),
+
     #[error("This link is invalid or has expired")]
     InvalidToken,
 
@@ -96,6 +100,12 @@ impl IntoResponse for AppError {
                     "password".into(),
                     vec!["is incorrect".into()],
                 )])),
+            ),
+
+            Self::IncorrectCode(field) => (
+                StatusCode::BAD_REQUEST,
+                self.to_string(),
+                Some(HashMap::from([(field.into(), vec!["is incorrect".into()])])),
             ),
 
             Self::Conflict(_) => (StatusCode::CONFLICT, self.to_string(), None),

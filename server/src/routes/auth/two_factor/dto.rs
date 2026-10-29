@@ -11,6 +11,20 @@ pub(super) struct PasswordConfirmation {
     pub password: String,
 }
 
+#[derive(Deserialize, Validate, ToSchema)]
+pub(super) struct AuthenticatorCode {
+    /// The 6-digit code the authenticator app shows
+    #[validate(length(min = 1, max = 16, message = "must be between 1 and 16 characters"))]
+    pub code: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub(super) struct RecoveryCodes {
+    /// Each signs in once in place of an authenticator code. The server keeps only their hashes,
+    /// so this response is the one time they are shown.
+    pub recovery_codes: Vec<String>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub(super) struct TwoFactorStatus {
     pub enabled: bool,

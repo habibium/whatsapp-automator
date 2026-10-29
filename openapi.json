@@ -376,6 +376,83 @@
         }
       }
     },
+    "/api/auth/two-factor/enable": {
+      "post": {
+        "summary": "Turn on two-step verification",
+        "description": "Confirms the pending key with a code from the authenticator app, after which signing in asks\nfor a code too. Returns ten recovery codes, each good for one sign-in without the app. Every\nsession of the account ends, this one included, and this browser gets a new one, so a session\nsomeone else may already hold does not outlast the change.",
+        "operationId": "enable_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticatorCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "A new session cookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The code is wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already on, or the setup was never started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/two-factor/setup": {
       "post": {
         "summary": "Start setting up two-step verification",
@@ -534,6 +611,18 @@
   },
   "components": {
     "schemas": {
+      "AuthenticatorCode": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code the authenticator app shows"
+          }
+        }
+      },
       "Credentials": {
         "type": "object",
         "required": [
@@ -655,6 +744,21 @@
           "token": {
             "type": "string",
             "description": "The token from the reset email's link"
+          }
+        }
+      },
+      "RecoveryCodes": {
+        "type": "object",
+        "required": [
+          "recovery_codes"
+        ],
+        "properties": {
+          "recovery_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Each signs in once in place of an authenticator code. The server keeps only their hashes,\nso this response is the one time they are shown."
           }
         }
       },

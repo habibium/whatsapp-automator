@@ -169,6 +169,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/two-factor/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn on two-step verification
+         * @description Confirms the pending key with a code from the authenticator app, after which signing in asks
+         *     for a code too. Returns ten recovery codes, each good for one sign-in without the app. Every
+         *     session of the account ends, this one included, and this browser gets a new one, so a session
+         *     someone else may already hold does not outlast the change.
+         */
+        post: operations["enable_two_factor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/two-factor/setup": {
         parameters: {
             query?: never;
@@ -236,6 +259,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AuthenticatorCode: {
+            /** @description The 6-digit code the authenticator app shows */
+            code: string;
+        };
         Credentials: {
             email: string;
             password: string;
@@ -271,6 +298,13 @@ export interface components {
             password: string;
             /** @description The token from the reset email's link */
             token: string;
+        };
+        RecoveryCodes: {
+            /**
+             * @description Each signs in once in place of an authenticator code. The server keeps only their hashes,
+             *     so this response is the one time they are shown.
+             */
+            recovery_codes: string[];
         };
         SessionResponse: {
             user: null | components["schemas"]["UserResponse"];
@@ -608,6 +642,65 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    enable_two_factor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthenticatorCode"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description A new session cookie */
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            /** @description The code is wrong */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Already on, or the setup was never started */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
