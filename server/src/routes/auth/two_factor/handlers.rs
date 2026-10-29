@@ -165,6 +165,39 @@ pub async fn disable_two_factor(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Replace the recovery codes
+///
+/// Checks the password, then returns ten new recovery codes. The earlier ones stop working, used
+/// or not.
+#[utoipa::path(post, path = "/two-factor/recovery-codes", request_body = PasswordConfirmation, responses(
+    (status = OK, body = RecoveryCodes),
+    (status = BAD_REQUEST, description = "The password is incorrect", body = ErrorBody),
+    (status = UNAUTHORIZED, body = ErrorBody),
+    (status = CONFLICT, description = "Two-step verification is off", body = ErrorBody),
+    (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
+))]
+pub async fn regenerate_recovery_codes(
+    State(state): State<AppState>,
+    session: Session,
+    ValidatedJson(payload): ValidatedJson<PasswordConfirmation>,
+) -> Result<impl IntoResponse, AppError> {
+    let user = session.user;
+    reauth::confirm_password(&state.pool, user.id, payload.password).await?;
+
+    let mut tx = state.pool.begin().await?;
+    // Otherwise a concurrent disable could commit in between, and new codes would outlive it
+    db::users::lock(&mut *tx, user.id).await?;
+    if !db::two_factor::status(&mut *tx, user.id).await?.enabled {
+        return Err(AppError::Conflict("Two-step verification is off"));
+    }
+    let recovery_codes = replace_recovery_codes(&mut tx, user.id).await?;
+    tx.commit().await?;
+
+    alert(&state, user.email, SecurityEvent::RecoveryCodesRegenerated)?;
+
+    Ok((NO_STORE, Json(RecoveryCodes { recovery_codes })))
+}
+
 async fn replace_recovery_codes(
     conn: &mut PgConnection,
     user_id: Uuid,
