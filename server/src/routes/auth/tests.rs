@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::{
     Router,
@@ -21,7 +21,7 @@ use crate::{
     },
     crypto::Cipher,
     db,
-    email::Mailer,
+    email::{Email, Mailer},
     rate_limit::RateLimits,
     state::AppState,
 };
@@ -38,6 +38,7 @@ const INVALID_LINK: &str = "This link is invalid or has expired";
 struct TestApp {
     router: Router,
     pool: PgPool,
+    outbox: Arc<Mutex<Vec<(String, Email)>>>,
 }
 
 struct TestResponse {
@@ -73,9 +74,10 @@ impl TestApp {
     }
 
     fn with_pwned_passwords(pool: PgPool, app_url: &str, pwned_passwords: PwnedPasswords) -> Self {
+        let outbox = Arc::default();
         let state = AppState {
             pool: pool.clone(),
-            mailer: Mailer::Log,
+            mailer: Mailer::Outbox(Arc::clone(&outbox)),
             app_url: Arc::new(Url::parse(app_url).unwrap()),
             rate_limits: RateLimits::default(),
             pwned_passwords,
@@ -86,7 +88,19 @@ impl TestApp {
         Self {
             router: router.with_state(state),
             pool,
+            outbox,
         }
+    }
+
+    /// Subject and plain text of each email sent to `to`, oldest first
+    fn emails_to(&self, to: &str) -> Vec<(&'static str, String)> {
+        self.outbox
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(recipient, _)| recipient == to)
+            .map(|(_, email)| (email.subject, email.text.clone()))
+            .collect()
     }
 
     async fn post(&self, path: &str, body: Value, cookie: Option<&str>) -> TestResponse {

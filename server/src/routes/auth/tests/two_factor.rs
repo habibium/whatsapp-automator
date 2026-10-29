@@ -196,6 +196,12 @@ async fn turning_on_takes_the_password_then_a_code_from_the_app(pool: PgPool) {
         .await;
     assert_eq!(enabled.status, StatusCode::OK);
     assert_eq!(enabled.body["recovery_codes"].as_array().unwrap().len(), 10);
+    let subjects: Vec<_> = app
+        .emails_to(EMAIL)
+        .into_iter()
+        .map(|(subject, _)| subject)
+        .collect();
+    assert_eq!(subjects, ["Two-step verification is on"]);
 
     let session = enabled.cookie("session");
     let on = app.get("/two-factor", &session).await;

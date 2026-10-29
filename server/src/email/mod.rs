@@ -20,6 +20,8 @@ pub enum Mailer {
     },
     /// Development fallback: each email, link included, goes to the log
     Log,
+    #[cfg(test)]
+    Outbox(std::sync::Arc<std::sync::Mutex<Vec<(String, Email)>>>),
 }
 
 impl Mailer {
@@ -53,6 +55,15 @@ impl Mailer {
     /// The caller never waits on SMTP, so a response takes the same time whether or not an email
     /// went out, and a slow mail server cannot hold up a request
     pub fn send_in_background(&self, to: String, email: Email) {
+        // Kept at once rather than in a task, so a test can read it as soon as the response is back
+        #[cfg(test)]
+        if let Self::Outbox(outbox) = self {
+            outbox
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push((to, email));
+            return;
+        }
         let mailer = self.clone();
         tokio::spawn(async move {
             if let Err(error) = mailer.send(&to, email).await {
@@ -79,6 +90,8 @@ impl Mailer {
                     email.text
                 );
             }
+            #[cfg(test)]
+            Self::Outbox(_) => unreachable!("send_in_background keeps these"),
         }
 
         Ok(())
