@@ -22,6 +22,8 @@ use crate::{
     state::AppState,
 };
 
+mod passkeys;
+
 const PASSWORD: &str = "correct horse";
 const INVALID_LINK: &str = "This link is invalid or has expired";
 
