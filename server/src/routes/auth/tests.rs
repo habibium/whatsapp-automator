@@ -23,6 +23,8 @@ use crate::{
     state::AppState,
 };
 
+mod two_factor;
+
 const PASSWORD: &str = "correct horse";
 const INVALID_LINK: &str = "This link is invalid or has expired";
 
