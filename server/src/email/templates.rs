@@ -1,0 +1,174 @@
+use chrono::TimeDelta;
+use url::Url;
+
+use super::Email;
+use crate::auth::token::Purpose;
+
+const PRODUCT_NAME: &str = "WhatsApp Automator";
+
+// Email clients ignore stylesheets and custom properties, so the neutral theme's light values
+// are inlined: text primary and secondary, accent, and the border on white.
+const FONT: &str =
+    "Figtree, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const TEXT: &str = "#000000";
+const MUTED: &str = "#474747";
+const ACCENT: &str = "#1b1b1b";
+const ON_ACCENT: &str = "#ffffff";
+const HAIRLINE: &str = "#ebebeb";
+
+pub fn verify_email(link: &Url) -> Email {
+    let expires = in_words(Purpose::VerifyEmail.ttl());
+    render(&Layout {
+        subject: "Verify your email address",
+        heading: "Verify your email address.",
+        body: format!(
+            "Confirm this address to finish setting up your {PRODUCT_NAME} account. The link expires in {expires}."
+        ),
+        action: "Verify email address",
+        link,
+        footer: "If you didn't create an account, you can ignore this email.",
+    })
+}
+
+pub fn reset_password(link: &Url) -> Email {
+    let expires = in_words(Purpose::ResetPassword.ttl());
+    render(&Layout {
+        subject: "Reset your password",
+        heading: "Reset your password.",
+        body: format!(
+            "Someone asked to reset the password for your {PRODUCT_NAME} account. The link works once and expires in {expires}."
+        ),
+        action: "Choose a new password",
+        link,
+        footer: "If it wasn't you, ignore this email and your password stays the same.",
+    })
+}
+
+struct Layout<'a> {
+    subject: &'static str,
+    heading: &'static str,
+    body: String,
+    action: &'static str,
+    link: &'a Url,
+    footer: &'static str,
+}
+
+fn render(layout: &Layout) -> Email {
+    let Layout {
+        subject,
+        heading,
+        body,
+        action,
+        link,
+        footer,
+    } = layout;
+    let link = escape(link.as_str());
+
+    let text = format!(
+        "{heading}\n\n{body}\n\n{action}: {}\n\n{footer}\n",
+        layout.link
+    );
+
+    // Tables and inline styles are what every client, Outlook included, lays out the same way
+    let html = format!(
+        r#"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{subject}</title>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<div style="display:none;max-height:0;overflow:hidden;">{body}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+<tr><td align="center" style="padding:48px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;font-family:{FONT};color:{TEXT};">
+<tr><td style="padding-bottom:40px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+<td valign="middle" style="width:12px;"><div style="width:12px;height:12px;background:{ACCENT};border-radius:6px 6px 6px 0;font-size:0;line-height:0;">&nbsp;</div></td>
+<td style="padding-left:8px;font-size:15px;line-height:20px;font-weight:600;letter-spacing:-0.012em;">{PRODUCT_NAME}</td>
+</tr></table>
+</td></tr>
+<tr><td style="padding-bottom:12px;font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.02em;">{heading}</td></tr>
+<tr><td style="padding-bottom:28px;font-size:15px;line-height:24px;color:{MUTED};">{body}</td></tr>
+<tr><td style="padding-bottom:28px;">
+<a href="{link}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:{ACCENT};color:{ON_ACCENT};font-size:15px;line-height:20px;font-weight:600;text-decoration:none;">{action}</a>
+</td></tr>
+<tr><td style="padding-bottom:32px;font-size:13px;line-height:20px;color:{MUTED};">Or paste this link into your browser:<br><a href="{link}" style="color:{TEXT};word-break:break-all;">{link}</a></td></tr>
+<tr><td style="padding-top:20px;border-top:1px solid {HAIRLINE};font-size:13px;line-height:20px;color:{MUTED};">{footer}</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+"#
+    );
+
+    Email {
+        subject,
+        text,
+        html,
+    }
+}
+
+fn in_words(duration: TimeDelta) -> String {
+    match duration.num_hours() {
+        1 => "an hour".into(),
+        hours => format!("{hours} hours"),
+    }
+}
+
+/// `APP_URL` is operator input, so the link is escaped before it lands in markup
+fn escape(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            c => escaped.push(c),
+        }
+    }
+    escaped
+}
+
+#[cfg(test)]
+mod tests {
+    use url::Url;
+
+    use super::{escape, reset_password, verify_email};
+
+    #[test]
+    fn escapes_markup() {
+        assert_eq!(escape(r#"a&b<c>"d'"#), "a&amp;b&lt;c&gt;&quot;d&#39;");
+    }
+
+    #[test]
+    fn link_is_in_both_parts_and_escaped_in_html() {
+        let link = Url::parse("https://example.com/verify-email?token=abc&x=1").unwrap();
+        let email = verify_email(&link);
+
+        assert!(
+            email
+                .text
+                .contains("https://example.com/verify-email?token=abc&x=1")
+        );
+        assert!(
+            email
+                .html
+                .contains(r#"href="https://example.com/verify-email?token=abc&amp;x=1""#)
+        );
+    }
+
+    #[test]
+    fn copy_quotes_how_long_each_link_lasts() {
+        let link = Url::parse("https://example.com/").unwrap();
+
+        assert!(verify_email(&link).text.contains("expires in 24 hours"));
+        assert!(reset_password(&link).text.contains("expires in an hour"));
+    }
+}

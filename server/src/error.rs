@@ -12,8 +12,19 @@ use utoipa::ToSchema;
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Unauthorized")]
-    #[expect(dead_code)]
     Unauthorized,
+
+    #[error("Incorrect email or password")]
+    InvalidCredentials,
+
+    #[error("Verify your email address before signing in")]
+    EmailNotVerified,
+
+    #[error("This link is invalid or has expired")]
+    InvalidToken,
+
+    #[error("Cross-site request refused")]
+    CrossSite,
 
     #[error("Not Found")]
     NotFound,
@@ -44,7 +55,13 @@ pub struct ErrorBody {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message, details) = match self {
-            Self::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string(), None),
+            Self::Unauthorized | Self::InvalidCredentials => {
+                (StatusCode::UNAUTHORIZED, self.to_string(), None)
+            }
+
+            Self::EmailNotVerified | Self::CrossSite => {
+                (StatusCode::FORBIDDEN, self.to_string(), None)
+            }
 
             Self::NotFound => (StatusCode::NOT_FOUND, self.to_string(), None),
 
@@ -70,7 +87,7 @@ impl IntoResponse for AppError {
 
             Self::Conflict(_) => (StatusCode::CONFLICT, self.to_string(), None),
 
-            Self::Json(_) => (StatusCode::BAD_REQUEST, self.to_string(), None),
+            Self::InvalidToken | Self::Json(_) => (StatusCode::BAD_REQUEST, self.to_string(), None),
 
             Self::Db(e) => {
                 tracing::error!(error = ?e, "database error");

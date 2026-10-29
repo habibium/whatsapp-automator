@@ -1,11 +1,12 @@
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use axum::{
     Router,
+    extract::Request,
     http::{HeaderValue, header},
     response::Response,
 };
-use server::{config::Config, state::AppState};
+use server::{config::Config, email::Mailer, state::AppState};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_http::{
@@ -37,6 +38,19 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = PgPoolOptions::new().connect(&config.database_url).await?;
     sqlx::migrate!().run(&pool).await?;
+    server::spawn_cleanup(pool.clone());
+
+    let mailer = Mailer::new(config.smtp_url.as_deref(), config.email_from)?;
+    tokio::spawn({
+        let mailer = mailer.clone();
+        async move { mailer.check().await }
+    });
+    tracing::info!("links in emails point at {}", config.app_url);
+    let state = AppState {
+        pool,
+        mailer,
+        app_url: Arc::new(config.app_url),
+    };
 
     let (router, api) = server::router();
 
@@ -75,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = router
         .fallback_service(web_router)
-        .with_state(AppState { pool })
+        .with_state(state)
         .merge(Scalar::with_url("/api/docs", api))
         .nest_service("/assets", assets_router)
         .layer(
@@ -86,7 +100,18 @@ async fn main() -> anyhow::Result<()> {
                 // woff2 is already compressed; encoding it only adds bytes
                 .compress_when(DefaultPredicate::new().and(NotForContentType::const_new("font/"))),
         )
-        .layer(TraceLayer::new_for_http());
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                // Path only, as query strings carry the tokens from emailed links. tower-http's own
+                // target keeps RUST_LOG filtering this span as before.
+                tracing::debug_span!(
+                    target: "tower_http::trace::make_span",
+                    "request",
+                    method = %request.method(),
+                    path = request.uri().path(),
+                )
+            }),
+        );
 
     let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, config.port)).await?;
     tracing::info!("server running on http://{}", listener.local_addr()?);

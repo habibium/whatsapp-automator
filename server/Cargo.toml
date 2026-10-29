@@ -7,21 +7,31 @@ edition.workspace = true
 anyhow = "1"
 argon2 = "0.6"
 axum = { version = "0.8", features = ["macros", "tracing"] }
+axum-extra = { version = "0.12", features = ["cookie"] }
+base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
+getrandom = "0.4"
+lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "pool", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "webpki-roots"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.11"
 sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
 thiserror = "2.0.20"
+time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.7", features = ["compression-br", "compression-gzip", "fs", "set-header", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.2"
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 uuid = { version = "1", features = ["serde", "v4"] }
 validator = { version = "0.21.0", features = ["derive"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
 
 [lints]
 workspace = true
