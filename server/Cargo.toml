@@ -9,6 +9,7 @@ argon2 = "0.6"
 axum = { version = "0.8", features = ["macros", "tracing"] }
 axum-extra = { version = "0.12", features = ["cookie"] }
 base64 = "0.23"
+chacha20poly1305 = { version = "0.11", features = ["zeroize"] }
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 getrandom = "0.4"
@@ -16,14 +17,17 @@ governor = "0.10"
 lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "pool", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "webpki-roots"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha1 = "0.11"
 sha2 = "0.11"
 sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
+subtle = "2"
 thiserror = "2.0.20"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
+totp-rs = { version = "6", default-features = false, features = ["std", "otpauth", "zeroize"] }
 tower-http = { version = "0.7", features = ["compression-br", "compression-gzip", "fs", "set-header", "trace"] }
 tower_governor = { version = "0.8", default-features = false, features = ["axum", "tracing"] }
 tracing = "0.1"
@@ -38,6 +42,7 @@ webpki-roots = "1"
 # State serialisation only ever writes ceremony state to Postgres, never to the client
 webauthn-rs = { version = "0.5.5", default-features = false, features = ["conditional-ui", "danger-allow-state-serialisation"] }
 webauthn-rs-proto = "0.5.5"
+zeroize = "1"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

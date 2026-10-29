@@ -20,6 +20,10 @@ pub enum AppError {
     #[error("Verify your email address before signing in")]
     EmailNotVerified,
 
+    /// No sign-in waits for a second factor: it expired, ran out of attempts, or never started
+    #[error("This sign-in has ended; sign in again")]
+    SignInExpired,
+
     /// The signed-in user's password, asked again before a sensitive change, did not match
     #[error("Validation Failed")]
     IncorrectPassword,
@@ -31,6 +35,10 @@ pub enum AppError {
     /// Unknown passkey, failed verification, or a sign-in that expired or already finished
     #[error("This passkey could not sign you in")]
     PasskeySignInFailed,
+
+    /// An authenticator or recovery code did not match; names the request field that held it
+    #[error("Validation Failed")]
+    IncorrectCode(&'static str),
 
     #[error("This link is invalid or has expired")]
     InvalidToken,
@@ -80,9 +88,10 @@ impl IntoResponse for AppError {
         };
 
         let (status, message, details) = match self {
-            Self::Unauthorized | Self::InvalidCredentials | Self::PasskeySignInFailed => {
-                (StatusCode::UNAUTHORIZED, self.to_string(), None)
-            }
+            Self::Unauthorized
+            | Self::InvalidCredentials
+            | Self::PasskeySignInFailed
+            | Self::SignInExpired => (StatusCode::UNAUTHORIZED, self.to_string(), None),
 
             Self::EmailNotVerified | Self::CrossSite => {
                 (StatusCode::FORBIDDEN, self.to_string(), None)
@@ -119,6 +128,12 @@ impl IntoResponse for AppError {
                     "password".into(),
                     vec!["is incorrect".into()],
                 )])),
+            ),
+
+            Self::IncorrectCode(field) => (
+                StatusCode::BAD_REQUEST,
+                self.to_string(),
+                Some(HashMap::from([(field.into(), vec!["is incorrect".into()])])),
             ),
 
             Self::Conflict(_) => (StatusCode::CONFLICT, self.to_string(), None),

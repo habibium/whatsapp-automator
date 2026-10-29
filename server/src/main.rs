@@ -10,7 +10,8 @@ use axum::{
     response::Response,
 };
 use server::{
-    ClientIpHeader, PwnedPasswords, RateLimits, config::Config, email::Mailer, state::AppState,
+    ClientIpHeader, PwnedPasswords, RateLimits, config::Config, crypto::Cipher, email::Mailer,
+    state::AppState,
 };
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -57,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
         app_url: Arc::new(config.app_url),
         rate_limits: RateLimits::default(),
         pwned_passwords: PwnedPasswords::hibp()?,
+        cipher: Cipher::new(&config.encryption_key),
     };
 
     let (router, api) = server::router();

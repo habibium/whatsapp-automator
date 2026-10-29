@@ -7,6 +7,7 @@ mod handlers;
 mod passkeys;
 #[cfg(test)]
 mod tests;
+mod two_factor;
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -19,4 +20,5 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::forgot_password))
         .routes(routes!(handlers::reset_password))
         .merge(passkeys::router())
+        .merge(two_factor::router())
 }

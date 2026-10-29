@@ -70,6 +70,15 @@ impl From<db::users::User> for UserResponse {
     }
 }
 
+/// With two-step verification on, the password only starts the sign-in, and
+/// `POST /signin/two-factor` finishes it
+#[derive(Serialize, ToSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub(super) enum SignInResponse {
+    SignedIn { user: UserResponse },
+    TwoFactorRequired,
+}
+
 #[derive(Serialize, ToSchema)]
 pub(super) struct EmailVerified {
     pub user: UserResponse,

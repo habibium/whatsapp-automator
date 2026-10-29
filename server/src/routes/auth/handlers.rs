@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use super::dto::{
     Credentials, EmailAddress, EmailToken, EmailVerified, PasswordReset, SessionResponse,
-    SignInCredentials, UserResponse,
+    SignInCredentials, SignInResponse, UserResponse,
 };
 use crate::{
     AppState,
@@ -20,6 +20,7 @@ use crate::{
         cookie, password,
         session::{self, Session},
         token::{self, Purpose, Token},
+        two_factor,
     },
     db::{self, users::User},
     email::templates::{self, SecurityEvent},
@@ -78,9 +79,11 @@ pub async fn signup(
 
 /// Sign in
 ///
-/// Starts a session for a verified account and sets it as an `HttpOnly` cookie.
+/// Starts a session for a verified account and sets it as an `HttpOnly` cookie. With two-step
+/// verification on, answers `two_factor_required` instead and sets a cookie that
+/// `POST /signin/two-factor` needs within five minutes to finish the sign-in.
 #[utoipa::path(post, path = "/signin", request_body = SignInCredentials, responses(
-    (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "The session cookie"))),
+    (status = OK, body = SignInResponse, headers(("set-cookie" = String, description = "The session cookie, or the one that carries the sign-in to its second factor"))),
     (status = BAD_REQUEST, body = ErrorBody),
     (status = UNAUTHORIZED, description = "Unknown email or wrong password", body = ErrorBody),
     (status = FORBIDDEN, description = "The address is not verified yet", body = ErrorBody),
@@ -91,7 +94,7 @@ pub async fn signin(
     State(state): State<AppState>,
     jar: CookieJar,
     ValidatedJson(payload): ValidatedJson<SignInCredentials>,
-) -> Result<(CookieJar, Json<UserResponse>), AppError> {
+) -> Result<(CookieJar, Json<SignInResponse>), AppError> {
     let email = normalize(&payload.email);
     // Ahead of the lookup and Argon2, so a refused guess costs next to nothing
     state.rate_limits.signin(&email)?;
@@ -107,17 +110,24 @@ pub async fn signin(
         return Err(AppError::EmailNotVerified);
     }
 
-    let jar = session::start_with_password(
-        &state.pool,
-        jar,
-        user.id,
-        &password_hash,
-        state.secure_cookies(),
-    )
-    .await?
-    .ok_or(AppError::InvalidCredentials)?;
+    let secure = state.secure_cookies();
+    let mut tx = state.pool.begin().await?;
+    // Waits for a change to two-step verification in flight, so turning it on cannot sign every
+    // session out and then meet one that started without the second factor
+    db::users::lock(&mut *tx, user.id).await?;
+    let (started, response) = if db::two_factor::is_enabled(&mut *tx, user.id).await? {
+        let started =
+            two_factor::start_challenge(&mut *tx, jar, user.id, &password_hash, secure).await?;
+        (started, SignInResponse::TwoFactorRequired)
+    } else {
+        let started =
+            session::start_with_password(&mut *tx, jar, user.id, &password_hash, secure).await?;
+        (started, SignInResponse::SignedIn { user: user.into() })
+    };
+    let jar = started.ok_or(AppError::InvalidCredentials)?;
+    tx.commit().await?;
 
-    Ok((jar, Json(user.into())))
+    Ok((jar, Json(response)))
 }
 
 /// Sign out
@@ -251,8 +261,9 @@ pub async fn forgot_password(
 
 /// Reset password
 ///
-/// Spends the token from a reset email and sets the new password. Every session and every other
-/// emailed link of the account stops working, so the user signs in again everywhere.
+/// Spends the token from a reset email and sets the new password. Every session, sign-in waiting
+/// for a second factor and other emailed link of the account stops working, so the user signs in
+/// again everywhere.
 #[utoipa::path(post, path = "/reset-password", request_body = PasswordReset, responses(
     (status = OK, body = UserResponse),
     (status = BAD_REQUEST, description = "Invalid or breached password, or the link is malformed, expired or already used", body = ErrorBody),
@@ -277,6 +288,7 @@ pub async fn reset_password(
     let user = db::users::set_password(&mut *tx, user_id, &password_hash).await?;
     db::sessions::delete_for_user(&mut *tx, user.id).await?;
     db::tokens::delete_all_for_user(&mut *tx, user.id).await?;
+    db::two_factor::delete_challenges_for_user(&mut *tx, user.id).await?;
     tx.commit().await?;
 
     let alert = templates::security_alert(SecurityEvent::PasswordChanged, &state.app_url)?;

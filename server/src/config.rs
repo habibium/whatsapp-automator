@@ -2,6 +2,7 @@ use std::{env, path::PathBuf};
 
 use anyhow::Context;
 use axum::http::HeaderName;
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use lettre::message::Mailbox;
 use url::Url;
 
@@ -17,13 +18,19 @@ pub struct Config {
     /// Header a trusted proxy sets to the client's address, such as `CF-Connecting-IP`; `None`
     /// keys the rate limit on the peer address
     pub client_ip_header: Option<HeaderName>,
+    /// Seals secrets stored in the database, such as two-step verification keys
+    pub encryption_key: [u8; 32],
 }
+
+/// Anyone can read this key, so whatever a debug build encrypts with it is as good as plaintext
+const DEV_ENCRYPTION_KEY: [u8; 32] = *b"development key, not for release";
 
 impl Config {
     /// # Errors
-    /// `DATABASE_URL` missing, `APP_URL` missing from a release build, `PORT` or `APP_URL`
-    /// malformed, an https `APP_URL` without `SMTP_URL`, `SMTP_URL` without a valid
-    /// `EMAIL_FROM`, or a `CLIENT_IP_HEADER` that is malformed or one proxies append to.
+    /// `DATABASE_URL` missing, `APP_URL` or `ENCRYPTION_KEY` missing from a release build, `PORT`,
+    /// `APP_URL` or `ENCRYPTION_KEY` malformed, an https `APP_URL` without `SMTP_URL`, `SMTP_URL`
+    /// without a valid `EMAIL_FROM`, or a `CLIENT_IP_HEADER` that is malformed or one proxies
+    /// append to.
     pub fn from_env() -> anyhow::Result<Self> {
         let port = match env::var("PORT") {
             Ok(value) => value.parse().context("PORT must be a valid port number")?,
@@ -72,6 +79,25 @@ impl Config {
             "CLIENT_IP_HEADER must be a header the proxy overwrites, such as CF-Connecting-IP"
         );
 
+        let encryption_key = match env::var("ENCRYPTION_KEY") {
+            Ok(key) => BASE64_STANDARD
+                .decode(key.trim())
+                .ok()
+                .and_then(|key| key.try_into().ok())
+                .context(
+                    "ENCRYPTION_KEY must be 32 bytes in base64, from `openssl rand -base64 32`",
+                )?,
+            Err(_) if cfg!(debug_assertions) => {
+                tracing::warn!(
+                    "ENCRYPTION_KEY is not set, so secrets are encrypted with a well-known development key"
+                );
+                DEV_ENCRYPTION_KEY
+            }
+            Err(_) => anyhow::bail!(
+                "ENCRYPTION_KEY is required; generate one with `openssl rand -base64 32`"
+            ),
+        };
+
         Ok(Self {
             database_url: env::var("DATABASE_URL").context("DATABASE_URL is required")?,
             port,
@@ -81,6 +107,7 @@ impl Config {
             smtp_url,
             email_from,
             client_ip_header,
+            encryption_key,
         })
     }
 }

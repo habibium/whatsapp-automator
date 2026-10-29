@@ -7,6 +7,7 @@ import { VStack } from '@astryxdesign/core/VStack'
 
 import { PasskeysSection } from '@/components/passkeys-section'
 import { SiteFrame } from '@/components/site-frame'
+import { TwoFactorSection } from '@/components/two-factor-section'
 import { HOME_HREF } from '@/lib/session'
 
 export const Route = createFileRoute('/_authenticated/settings')({
@@ -34,6 +35,10 @@ function Settings() {
             messages, so a password alone shouldn't be enough.
           </Text>
         </VStack>
+
+        <Divider />
+
+        <TwoFactorSection />
 
         <Divider />
 

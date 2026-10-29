@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM totp_secrets WHERE user_id = $1 RETURNING enabled_at IS NOT NULL AS \"enabled!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "enabled!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "307a6edc3e7bea72b0f2810a3a4d3e118245b0b614a23c3221857cef3fa2acfc"
+}

@@ -19,6 +19,7 @@ use crate::{
         session,
         token::{Purpose, Token},
     },
+    crypto::Cipher,
     db,
     email::Mailer,
     rate_limit::RateLimits,
@@ -28,6 +29,7 @@ use crate::{
 mod passkeys;
 mod pwned;
 mod rate_limit;
+mod two_factor;
 
 const PASSWORD: &str = "correct horse";
 const INVALID_LINK: &str = "This link is invalid or has expired";
@@ -77,6 +79,7 @@ impl TestApp {
             app_url: Arc::new(Url::parse(app_url).unwrap()),
             rate_limits: RateLimits::default(),
             pwned_passwords,
+            cipher: Cipher::new(&[0; 32]),
         };
         let (router, _) = crate::router();
 
@@ -128,6 +131,13 @@ impl TestApp {
             .await;
         assert_eq!(response.status, StatusCode::OK);
         response
+    }
+
+    /// A verified account and the cookie of a session signed in to it
+    async fn signed_in(&self, email: &str) -> (Uuid, String) {
+        let user_id = self.verified_user(email).await;
+        let session = self.signin(email, PASSWORD).await.cookie("session");
+        (user_id, session)
     }
 
     async fn verified_user(&self, email: &str) -> Uuid {

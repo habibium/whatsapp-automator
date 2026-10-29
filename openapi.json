@@ -511,7 +511,7 @@
     "/api/auth/reset-password": {
       "post": {
         "summary": "Reset password",
-        "description": "Spends the token from a reset email and sets the new password. Every session and every other\nemailed link of the account stops working, so the user signs in again everywhere.",
+        "description": "Spends the token from a reset email and sets the new password. Every session, sign-in waiting\nfor a second factor and other emailed link of the account stops working, so the user signs in\nagain everywhere.",
         "operationId": "reset_password",
         "requestBody": {
           "content": {
@@ -609,7 +609,7 @@
     "/api/auth/signin": {
       "post": {
         "summary": "Sign in",
-        "description": "Starts a session for a verified account and sets it as an `HttpOnly` cookie.",
+        "description": "Starts a session for a verified account and sets it as an `HttpOnly` cookie. With two-step\nverification on, answers `two_factor_required` instead and sets a cookie that\n`POST /signin/two-factor` needs within five minutes to finish the sign-in.",
         "operationId": "signin",
         "requestBody": {
           "content": {
@@ -629,13 +629,13 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "The session cookie"
+                "description": "The session cookie, or the one that carries the sign-in to its second factor"
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
+                  "$ref": "#/components/schemas/SignInResponse"
                 }
               }
             }
@@ -682,6 +682,73 @@
                 "description": "Seconds until another attempt is allowed"
               }
             },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/signin/two-factor": {
+      "post": {
+        "summary": "Finish signing in",
+        "description": "Completes a sign-in that `POST /signin` answered with `two_factor_required`, using a code from\nthe authenticator app or a recovery code. Each code works once. After five wrong codes the\nsign-in ends and has to start over from the password.",
+        "operationId": "verify_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecondFactor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The session cookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The code is wrong or was used already",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No sign-in is waiting: it expired, ran out of attempts or never started",
             "content": {
               "application/json": {
                 "schema": {
@@ -832,6 +899,322 @@
         }
       }
     },
+    "/api/auth/two-factor": {
+      "get": {
+        "summary": "Two-step verification status",
+        "description": "Whether signing in asks for a code from an authenticator app, and how many recovery codes are\nleft.",
+        "operationId": "get_two_factor",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/two-factor/disable": {
+      "post": {
+        "summary": "Turn off two-step verification",
+        "description": "Checks the password, then deletes the authenticator key and every recovery code, so signing in\nasks for the password alone again.",
+        "operationId": "disable_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "The password is incorrect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Two-step verification is already off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/two-factor/enable": {
+      "post": {
+        "summary": "Turn on two-step verification",
+        "description": "Confirms the pending key with a code from the authenticator app, after which signing in asks\nfor a code too. Returns ten recovery codes, each good for one sign-in without the app. Every\nsession of the account ends, this one included, and this browser gets a new one, so a session\nsomeone else may already hold does not outlast the change.",
+        "operationId": "enable_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticatorCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "A new session cookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The code is wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already on, or the setup was never started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/two-factor/recovery-codes": {
+      "post": {
+        "summary": "Replace the recovery codes",
+        "description": "Checks the password, then returns ten new recovery codes. The earlier ones stop working, used\nor not.",
+        "operationId": "regenerate_recovery_codes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The password is incorrect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Two-step verification is off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/two-factor/setup": {
+      "post": {
+        "summary": "Start setting up two-step verification",
+        "description": "Checks the password, then creates a key for an authenticator app. Signing in does not ask for\ncodes until `POST /two-factor/enable` confirms the app shows the right one. Starting again\nreplaces a key that was never confirmed.",
+        "operationId": "setup_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorSetup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The password is incorrect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Two-step verification is already on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/verify-email": {
       "post": {
         "summary": "Verify email",
@@ -941,6 +1324,18 @@
   },
   "components": {
     "schemas": {
+      "AuthenticatorCode": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code the authenticator app shows"
+          }
+        }
+      },
       "ConfirmPasskeyChange": {
         "type": "object",
         "description": "The account password, asked again before a passkey is added or removed",
@@ -1152,6 +1547,18 @@
           }
         }
       },
+      "PasswordConfirmation": {
+        "type": "object",
+        "description": "The account password, asked again before a change to two-step verification",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
+      },
       "PasswordReset": {
         "type": "object",
         "required": [
@@ -1167,6 +1574,44 @@
             "description": "The token from the reset email's link"
           }
         }
+      },
+      "RecoveryCode": {
+        "type": "object",
+        "required": [
+          "recovery_code"
+        ],
+        "properties": {
+          "recovery_code": {
+            "type": "string",
+            "description": "One of the codes saved when two-step verification was turned on"
+          }
+        }
+      },
+      "RecoveryCodes": {
+        "type": "object",
+        "required": [
+          "recovery_codes"
+        ],
+        "properties": {
+          "recovery_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Each signs in once in place of an authenticator code. The server keeps only their hashes,\nso this response is the one time they are shown."
+          }
+        }
+      },
+      "SecondFactor": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AuthenticatorCode"
+          },
+          {
+            "$ref": "#/components/schemas/RecoveryCode"
+          }
+        ],
+        "description": "The second step of a sign-in: a code from the authenticator app, or a recovery code"
       },
       "SessionResponse": {
         "type": "object",
@@ -1199,6 +1644,83 @@
           },
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "SignInResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "user",
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "signed_in"
+                ]
+              },
+              "user": {
+                "$ref": "#/components/schemas/UserResponse"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "two_factor_required"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "With two-step verification on, the password only starts the sign-in, and\n`POST /signin/two-factor` finishes it"
+      },
+      "TwoFactorSetup": {
+        "type": "object",
+        "description": "What an authenticator app needs to start showing codes for the account",
+        "required": [
+          "otpauth_url",
+          "secret",
+          "qr_code"
+        ],
+        "properties": {
+          "otpauth_url": {
+            "type": "string",
+            "description": "Adds the account to an app that opens `otpauth://` links"
+          },
+          "qr_code": {
+            "type": "string",
+            "description": "`otpauth_url` as a QR code: an SVG image in a `data:` URL"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The key in base32, for typing into an app by hand"
+          }
+        }
+      },
+      "TwoFactorStatus": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "recovery_codes_remaining"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "recovery_codes_remaining": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unused recovery codes; 0 while two-step verification is off"
           }
         }
       },

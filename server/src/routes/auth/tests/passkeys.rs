@@ -81,13 +81,6 @@ struct Registered {
 }
 
 impl TestApp {
-    /// A verified account and the cookie of a session signed in to it
-    async fn signed_in(&self, email: &str) -> (Uuid, String) {
-        let user_id = self.verified_user(email).await;
-        let cookie = self.signin(email, PASSWORD).await.cookie("session");
-        (user_id, cookie)
-    }
-
     async fn start_registration(&self, session: &str, password: &str) -> TestResponse {
         self.post(
             "/passkeys/registration/start",

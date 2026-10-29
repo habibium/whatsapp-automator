@@ -20,6 +20,7 @@ import { AuthLayout } from '@/components/auth-layout'
 import { EmailField } from '@/components/email-field'
 import { PasskeySignIn } from '@/components/passkey-sign-in'
 import { PasswordField } from '@/components/password-field'
+import { TwoFactorSignIn } from '@/components/two-factor-sign-in'
 import type { Notice } from '@/lib/notice'
 import type { User } from '@/lib/session'
 
@@ -61,6 +62,7 @@ type Problem =
   | { kind: 'credentials' }
   | { kind: 'unverified'; email: string; isResent: boolean }
   | { kind: 'rate-limited'; retryAfter?: number }
+  | { kind: 'two-factor-ended' }
   | { kind: 'unexpected' }
 
 function SignIn() {
@@ -70,6 +72,7 @@ function SignIn() {
   const notice = useLocation({ select: (location) => location.state.notice })
   const knownEmail = useLocation({ select: (location) => location.state.email })
   const [problem, setProblem] = useState<Problem | null>(null)
+  const [isSecondStep, setIsSecondStep] = useState(false)
 
   const finishSignIn = async (user: User) => {
     setSessionUser(queryClient, user)
@@ -90,8 +93,12 @@ function SignIn() {
         const { data, error, response } = await api.POST('/api/auth/signin', {
           body: { email, password: value.password },
         })
+        if (data?.status === 'two_factor_required') {
+          setIsSecondStep(true)
+          return
+        }
         if (data) {
-          await finishSignIn(data)
+          await finishSignIn(data.user)
           return
         }
         if (response.status === 401) {
@@ -126,6 +133,19 @@ function SignIn() {
     } catch {
       setProblem({ kind: 'unexpected' })
     }
+  }
+
+  if (isSecondStep) {
+    return (
+      <TwoFactorSignIn
+        onSignedIn={finishSignIn}
+        onEnded={() => {
+          setIsSecondStep(false)
+          setProblem({ kind: 'two-factor-ended' })
+        }}
+        onCancel={() => setIsSecondStep(false)}
+      />
+    )
   }
 
   return (
@@ -303,6 +323,14 @@ function ProblemBanner({ problem, onResend }: ProblemBannerProps) {
           status="error"
           title={TOO_MANY_ATTEMPTS}
           description={tryAgainIn(problem.retryAfter)}
+        />
+      )
+    case 'two-factor-ended':
+      return (
+        <Banner
+          status="warning"
+          title="Sign in again."
+          description="The code step ends after five wrong codes or five minutes."
         />
       )
     case 'unexpected':

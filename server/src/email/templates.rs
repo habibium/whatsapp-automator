@@ -47,7 +47,6 @@ pub fn reset_password(link: &Url) -> Email {
 
 /// An account change the owner should hear about; the email offers the remedy for one they did not
 /// make
-#[expect(dead_code, reason = "two-step verification and passkeys send the rest")]
 #[derive(Clone, Copy)]
 pub enum SecurityEvent {
     PasswordChanged,
