@@ -12,6 +12,7 @@ check: check-rust check-web
 check-rust:
     cargo clippy --workspace --all-targets -- -D warnings
     cargo run -q --bin openapi -- --check
+    cargo test --workspace
 
 check-web:
     pnpm --dir web check
