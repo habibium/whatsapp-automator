@@ -12,6 +12,7 @@ The maintainer runs a hosted instance at https://wa.habibium.com. It runs the sa
 
 - Rust nightly (`rustup toolchain install nightly`), plus `cargo install bacon just mprocs git-cliff`
 - Node 24+ and `pnpm`
+- OpenSSL headers and `pkg-config` (`libssl-dev` on Debian), which the passkey library links against
 
 ## Development
 
@@ -79,3 +80,5 @@ Without `SMTP_URL` the server writes each email, link included, to its log, whic
 ## Accounts
 
 Sign-up takes an email address and a password. The account cannot sign in until the address is verified through the emailed link, which works for 24 hours. Opened in the browser that signed up, the link also signs the user in; anywhere else it only verifies the address, so a link opened in someone else's browser cannot sign them into the wrong account. Password reset links work once, for an hour, and end every session and outstanding link of the account. Sessions last 30 days and extend while in use; the browser holds them in an `HttpOnly` cookie, and the database stores only a SHA-256 hash of each session and link token.
+
+Passkeys are added under Security settings, after the password is entered again, and sign in without an email address or password: from the "Sign in with a passkey" button, or from the browser's autofill on the email field. A passkey always verifies its user with a PIN or biometrics, so a passkey sign-in needs no other step. Each passkey is bound to the host of `APP_URL`, its relying party ID, so moving the app to another host leaves existing passkeys unusable. Removing one asks for the password too, and either change emails the owner. A registration or sign-in challenge stays on the server for five minutes, named by an `HttpOnly` cookie, and works once.
