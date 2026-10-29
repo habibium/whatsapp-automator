@@ -304,6 +304,41 @@ async fn five_wrong_codes_end_the_setup(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn turning_on_needs_the_key_the_code_was_checked_against(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let (user_id, session) = app.signed_in(EMAIL).await;
+    let pending = async || {
+        crate::db::two_factor::find_pending(&app.pool, user_id, two_factor::SETUP_TTL)
+            .await
+            .unwrap()
+            .unwrap()
+    };
+    let step = i64::try_from(current_step()).unwrap();
+
+    // What an enable that checked its code against this key meets once another setup replaced it
+    app.set_up(&session).await;
+    let checked = pending().await;
+    app.set_up(&session).await;
+    let swapped = crate::db::two_factor::enable(&app.pool, user_id, &checked, step)
+        .await
+        .unwrap();
+    assert!(!swapped);
+    assert_eq!(
+        app.get("/two-factor", &session).await.body["enabled"],
+        false
+    );
+
+    let current = pending().await;
+    // Once only, since the key is no longer pending after that
+    for expected in [true, false] {
+        let enabled = crate::db::two_factor::enable(&app.pool, user_id, &current, step)
+            .await
+            .unwrap();
+        assert_eq!(enabled, expected);
+    }
+}
+
+#[sqlx::test]
 async fn turning_on_signs_out_every_other_session(pool: PgPool) {
     let app = TestApp::new(pool);
     let (user_id, here) = app.signed_in(EMAIL).await;
