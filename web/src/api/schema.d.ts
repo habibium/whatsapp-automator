@@ -87,6 +87,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/passkeys/signin/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish signing in with a passkey
+         * @description Verifies the credential `navigator.credentials.get()` returned against the challenge from the
+         *     start and starts a session for its owner, set as an `HttpOnly` cookie. Passkeys always verify
+         *     the user, by PIN or biometrics, so this sign-in needs no second step. A challenge works once.
+         */
+        post: operations["finish_sign_in"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/passkeys/signin/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start signing in with a passkey
+         * @description Returns the options for `navigator.credentials.get()`. The challenge stays on the server for
+         *     five minutes, named by a cookie.
+         */
+        post: operations["start_sign_in"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/passkeys/{id}": {
         parameters: {
             query?: never;
@@ -322,6 +365,16 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * @description Options for `navigator.credentials.get()`. They name no account, so the browser offers every
+         *     passkey it holds for this site; the page picks the mediation, modal or conditional.
+         */
+        PasskeyRequestOptions: {
+            /** @description For `PublicKeyCredential.parseRequestOptionsFromJSON` */
+            publicKey: {
+                [key: string]: unknown;
+            };
+        };
         PasskeyResponse: {
             /** Format: date-time */
             created_at: string;
@@ -333,6 +386,12 @@ export interface components {
              */
             last_used_at: string | null;
             name: string;
+        };
+        PasskeySignIn: {
+            /** @description `toJSON()` of the credential `navigator.credentials.get()` returned */
+            credential: {
+                [key: string]: unknown;
+            };
         };
         PasswordReset: {
             password: string;
@@ -542,6 +601,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    finish_sign_in: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeySignIn"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description The session cookie */
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown passkey, failed verification, or the sign-in expired or already finished */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The address is not verified yet */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    start_sign_in: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    /** @description Names this sign-in */
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyRequestOptions"];
                 };
             };
             500: {

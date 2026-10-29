@@ -39,12 +39,14 @@ pub fn relying_party(app_url: &Url) -> anyhow::Result<Webauthn> {
 #[derive(Clone, Copy)]
 pub enum Ceremony {
     Registration,
+    Authentication,
 }
 
 impl Ceremony {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Registration => "registration",
+            Self::Authentication => "authentication",
         }
     }
 }

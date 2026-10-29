@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
-use webauthn_rs::prelude::RegisterPublicKeyCredential;
-use webauthn_rs_proto::PublicKeyCredentialCreationOptions;
+use webauthn_rs::prelude::{PublicKeyCredential, RegisterPublicKeyCredential};
+use webauthn_rs_proto::{PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions};
 
 use crate::db;
 
@@ -24,6 +24,16 @@ pub(super) struct PasskeyCreationOptions {
     pub public_key: PublicKeyCredentialCreationOptions,
 }
 
+/// Options for `navigator.credentials.get()`. They name no account, so the browser offers every
+/// passkey it holds for this site; the page picks the mediation, modal or conditional.
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PasskeyRequestOptions {
+    /// For `PublicKeyCredential.parseRequestOptionsFromJSON`
+    #[schema(value_type = std::collections::HashMap<String, serde_json::Value>)]
+    pub public_key: PublicKeyCredentialRequestOptions,
+}
+
 #[derive(Deserialize, Validate, ToSchema)]
 pub(super) struct NewPasskey {
     /// `toJSON()` of the credential `navigator.credentials.create()` made
@@ -32,6 +42,13 @@ pub(super) struct NewPasskey {
     /// Tells the user's passkeys apart; blank or left out, it is "Passkey"
     #[validate(length(max = 64, message = "must be at most 64 characters"))]
     pub name: Option<String>,
+}
+
+#[derive(Deserialize, Validate, ToSchema)]
+pub(super) struct PasskeySignIn {
+    /// `toJSON()` of the credential `navigator.credentials.get()` returned
+    #[schema(value_type = std::collections::HashMap<String, serde_json::Value>)]
+    pub credential: PublicKeyCredential,
 }
 
 #[derive(Serialize, ToSchema)]

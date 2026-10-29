@@ -28,6 +28,10 @@ pub enum AppError {
     #[error("This passkey request is invalid or has expired")]
     PasskeyRejected,
 
+    /// Unknown passkey, failed verification, or a sign-in that expired or already finished
+    #[error("This passkey could not sign you in")]
+    PasskeySignInFailed,
+
     #[error("This link is invalid or has expired")]
     InvalidToken,
 
@@ -63,7 +67,7 @@ pub struct ErrorBody {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message, details) = match self {
-            Self::Unauthorized | Self::InvalidCredentials => {
+            Self::Unauthorized | Self::InvalidCredentials | Self::PasskeySignInFailed => {
                 (StatusCode::UNAUTHORIZED, self.to_string(), None)
             }
 

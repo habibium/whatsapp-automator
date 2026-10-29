@@ -3,6 +3,8 @@ use sqlx::{PgExecutor, types::Json};
 use uuid::Uuid;
 use webauthn_rs::prelude::Passkey;
 
+use super::users::User;
+
 /// What the owner sees of a passkey; the credential itself stays in the database
 pub struct SavedPasskey {
     pub id: Uuid,
@@ -48,6 +50,48 @@ pub async fn credential_ids(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Res
     )
     .fetch_all(db)
     .await
+}
+
+/// The passkey's id, its credential and its owner. The row stays locked until the transaction
+/// ends, so concurrent sign-ins with one passkey check its signature counter one at a time.
+pub async fn find_for_update(
+    db: impl PgExecutor<'_>,
+    credential_id: &[u8],
+) -> sqlx::Result<Option<(Uuid, Passkey, User)>> {
+    let row = sqlx::query!(
+        r#"SELECT p.id AS passkey_id, p.passkey AS "passkey: Json<Passkey>",
+            u.id, u.email, u.verified_at, u.created_at, u.updated_at
+        FROM passkeys p JOIN users u ON u.id = p.user_id
+        WHERE p.credential_id = $1
+        FOR UPDATE OF p"#,
+        credential_id
+    )
+    .fetch_optional(db)
+    .await?;
+
+    Ok(row.map(|row| {
+        let user = User {
+            id: row.id,
+            email: row.email,
+            verified_at: row.verified_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        };
+        (row.passkey_id, row.passkey.0, user)
+    }))
+}
+
+/// Saves the credential as a sign-in left it, counter and backup state included
+pub async fn record_use(db: impl PgExecutor<'_>, id: Uuid, passkey: &Passkey) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE passkeys SET passkey = $2, last_used_at = now() WHERE id = $1",
+        id,
+        Json(passkey) as _
+    )
+    .execute(db)
+    .await?;
+
+    Ok(())
 }
 
 /// Deletes the passkey only when it belongs to `user_id`; `false` when no such passkey does

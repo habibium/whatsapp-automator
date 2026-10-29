@@ -239,6 +239,120 @@
         }
       }
     },
+    "/api/auth/passkeys/signin/finish": {
+      "post": {
+        "summary": "Finish signing in with a passkey",
+        "description": "Verifies the credential `navigator.credentials.get()` returned against the challenge from the\nstart and starts a session for its owner, set as an `HttpOnly` cookie. Passkeys always verify\nthe user, by PIN or biometrics, so this sign-in needs no second step. A challenge works once.",
+        "operationId": "finish_sign_in",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeySignIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The session cookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown passkey, failed verification, or the sign-in expired or already finished",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The address is not verified yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/signin/start": {
+      "post": {
+        "summary": "Start signing in with a passkey",
+        "description": "Returns the options for `navigator.credentials.get()`. The challenge stays on the server for\nfive minutes, named by a cookie.",
+        "operationId": "start_sign_in",
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Names this sign-in"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRequestOptions"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/passkeys/{id}": {
       "delete": {
         "summary": "Remove a passkey",
@@ -835,6 +949,23 @@
           }
         }
       },
+      "PasskeyRequestOptions": {
+        "type": "object",
+        "description": "Options for `navigator.credentials.get()`. They name no account, so the browser offers every\npasskey it holds for this site; the page picks the mediation, modal or conditional.",
+        "required": [
+          "publicKey"
+        ],
+        "properties": {
+          "publicKey": {
+            "type": "object",
+            "description": "For `PublicKeyCredential.parseRequestOptionsFromJSON`",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "PasskeyResponse": {
         "type": "object",
         "required": [
@@ -862,6 +993,22 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "PasskeySignIn": {
+        "type": "object",
+        "required": [
+          "credential"
+        ],
+        "properties": {
+          "credential": {
+            "type": "object",
+            "description": "`toJSON()` of the credential `navigator.credentials.get()` returned",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
           }
         }
       },

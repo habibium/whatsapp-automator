@@ -7,22 +7,28 @@ use axum::{
 };
 use axum_extra::extract::cookie::CookieJar;
 use uuid::Uuid;
-use webauthn_rs::prelude::{CredentialID, PasskeyRegistration};
+use webauthn_rs::prelude::{
+    CredentialID, DiscoverableAuthentication, DiscoverableKey, PasskeyRegistration,
+};
 use webauthn_rs_proto::ResidentKeyRequirement;
 
-use super::dto::{ConfirmPasskeyChange, NewPasskey, PasskeyCreationOptions, PasskeyResponse};
+use super::dto::{
+    ConfirmPasskeyChange, NewPasskey, PasskeyCreationOptions, PasskeyRequestOptions,
+    PasskeyResponse, PasskeySignIn,
+};
 use crate::{
     AppState,
     auth::{
         cookie,
         passkey::{self, Ceremony},
         reauth,
-        session::Session,
+        session::{self, Session},
     },
     db,
     email::templates::{self, SecurityEvent},
     error::{AppError, ErrorBody},
     extract::ValidatedJson,
+    routes::auth::dto::UserResponse,
 };
 
 const DEFAULT_NAME: &str = "Passkey";
@@ -195,4 +201,102 @@ pub async fn remove(
     state.mailer.send_in_background(user.email, alert);
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Start signing in with a passkey
+///
+/// Returns the options for `navigator.credentials.get()`. The challenge stays on the server for
+/// five minutes, named by a cookie.
+#[utoipa::path(post, path = "/passkeys/signin/start", responses(
+    (status = OK, body = PasskeyRequestOptions, headers(("set-cookie" = String, description = "Names this sign-in"))),
+    (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
+))]
+pub async fn start_sign_in(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> Result<(CookieJar, Json<PasskeyRequestOptions>), AppError> {
+    let (options, authentication) = passkey::relying_party(&state.app_url)?
+        .start_discoverable_authentication()
+        .context("cannot start a passkey sign-in")?;
+
+    let jar = passkey::begin(
+        &state.pool,
+        jar,
+        Ceremony::Authentication,
+        None,
+        &authentication,
+        state.secure_cookies(),
+    )
+    .await?;
+
+    Ok((
+        jar,
+        Json(PasskeyRequestOptions {
+            public_key: options.public_key,
+        }),
+    ))
+}
+
+/// Finish signing in with a passkey
+///
+/// Verifies the credential `navigator.credentials.get()` returned against the challenge from the
+/// start and starts a session for its owner, set as an `HttpOnly` cookie. Passkeys always verify
+/// the user, by PIN or biometrics, so this sign-in needs no second step. A challenge works once.
+#[utoipa::path(post, path = "/passkeys/signin/finish", request_body = PasskeySignIn, responses(
+    (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "The session cookie"))),
+    (status = BAD_REQUEST, body = ErrorBody),
+    (status = UNAUTHORIZED, description = "Unknown passkey, failed verification, or the sign-in expired or already finished", body = ErrorBody),
+    (status = FORBIDDEN, description = "The address is not verified yet", body = ErrorBody),
+    (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
+))]
+pub async fn finish_sign_in(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    ValidatedJson(payload): ValidatedJson<PasskeySignIn>,
+) -> Result<(CookieJar, Json<UserResponse>), AppError> {
+    let secure = state.secure_cookies();
+    let authentication: DiscoverableAuthentication =
+        passkey::finish(&state.pool, &jar, Ceremony::Authentication, None, secure)
+            .await?
+            .ok_or(AppError::PasskeySignInFailed)?;
+
+    let webauthn = passkey::relying_party(&state.app_url)?;
+    let credential = payload.credential;
+    let (user_handle, credential_id) = webauthn
+        .identify_discoverable_authentication(&credential)
+        .map_err(|_| AppError::PasskeySignInFailed)?;
+
+    let mut tx = state.pool.begin().await?;
+    let (passkey_id, mut stored, user) = db::passkeys::find_for_update(&mut *tx, credential_id)
+        .await?
+        .ok_or(AppError::PasskeySignInFailed)?;
+    // Registration set the user handle to the owner's id, so any other value is not this passkey's
+    if user_handle != user.id {
+        return Err(AppError::PasskeySignInFailed);
+    }
+    let result = webauthn
+        .finish_discoverable_authentication(
+            &credential,
+            authentication,
+            &[DiscoverableKey::from(&stored)],
+        )
+        .map_err(|error| {
+            tracing::info!(?error, "passkey sign-in failed verification");
+            AppError::PasskeySignInFailed
+        })?;
+
+    // Checked after the passkey, so only its holder learns the account's state
+    if user.verified_at.is_none() {
+        return Err(AppError::EmailNotVerified);
+    }
+
+    stored.update_credential(&result);
+    db::passkeys::record_use(&mut *tx, passkey_id, &stored).await?;
+    let jar = session::start(&mut *tx, jar, user.id, secure).await?;
+    tx.commit().await?;
+
+    Ok((
+        cookie::PASSKEY_CEREMONY.clear(jar, secure),
+        Json(user.into()),
+    ))
 }
