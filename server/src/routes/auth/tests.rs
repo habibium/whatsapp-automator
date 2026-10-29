@@ -25,6 +25,7 @@ use crate::{
     state::AppState,
 };
 
+mod pwned;
 mod rate_limit;
 
 const PASSWORD: &str = "correct horse";
@@ -65,12 +66,16 @@ impl TestApp {
     }
 
     fn with_app_url(pool: PgPool, app_url: &str) -> Self {
+        Self::with_pwned_passwords(pool, app_url, PwnedPasswords::Listed(&[]))
+    }
+
+    fn with_pwned_passwords(pool: PgPool, app_url: &str, pwned_passwords: PwnedPasswords) -> Self {
         let state = AppState {
             pool: pool.clone(),
             mailer: Mailer::Log,
             app_url: Arc::new(Url::parse(app_url).unwrap()),
             rate_limits: RateLimits::default(),
-            pwned_passwords: PwnedPasswords::Listed(&[]),
+            pwned_passwords,
         };
         let (router, _) = crate::router();
 
