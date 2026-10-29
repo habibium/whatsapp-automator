@@ -14,6 +14,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 getrandom = "0.4"
 lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "pool", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "webpki-roots"] }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
@@ -21,6 +22,7 @@ sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tl
 thiserror = "2.0.20"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
+totp-rs = { version = "6", default-features = false, features = ["std", "otpauth", "zeroize"] }
 tower-http = { version = "0.7", features = ["compression-br", "compression-gzip", "fs", "set-header", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

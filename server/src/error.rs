@@ -21,7 +21,6 @@ pub enum AppError {
     EmailNotVerified,
 
     /// The signed-in user's password, asked again before a sensitive change, did not match
-    #[expect(dead_code, reason = "constructed by `auth::reauth`, which has no caller yet")]
     #[error("Validation Failed")]
     IncorrectPassword,
 

@@ -337,6 +337,114 @@
         }
       }
     },
+    "/api/auth/two-factor": {
+      "get": {
+        "summary": "Two-step verification status",
+        "description": "Whether signing in asks for a code from an authenticator app, and how many recovery codes are\nleft.",
+        "operationId": "get_two_factor",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/two-factor/setup": {
+      "post": {
+        "summary": "Start setting up two-step verification",
+        "description": "Checks the password, then creates a key for an authenticator app. Signing in does not ask for\ncodes until `POST /two-factor/enable` confirms the app shows the right one. Starting again\nreplaces a key that was never confirmed.",
+        "operationId": "setup_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorSetup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The password is incorrect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Two-step verification is already on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/verify-email": {
       "post": {
         "summary": "Verify email",
@@ -522,6 +630,18 @@
           }
         }
       },
+      "PasswordConfirmation": {
+        "type": "object",
+        "description": "The account password, asked again before a change to two-step verification",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
+      },
       "PasswordReset": {
         "type": "object",
         "required": [
@@ -569,6 +689,46 @@
           },
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "TwoFactorSetup": {
+        "type": "object",
+        "description": "What an authenticator app needs to start showing codes for the account",
+        "required": [
+          "otpauth_url",
+          "secret",
+          "qr_code"
+        ],
+        "properties": {
+          "otpauth_url": {
+            "type": "string",
+            "description": "Adds the account to an app that opens `otpauth://` links"
+          },
+          "qr_code": {
+            "type": "string",
+            "description": "`otpauth_url` as a QR code: an SVG image in a `data:` URL"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The key in base32, for typing into an app by hand"
+          }
+        }
+      },
+      "TwoFactorStatus": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "recovery_codes_remaining"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "recovery_codes_remaining": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unused recovery codes; 0 while two-step verification is off"
           }
         }
       },

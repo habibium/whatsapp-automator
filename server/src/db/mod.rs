@@ -1,5 +1,6 @@
 pub mod sessions;
 pub mod tokens;
+pub mod two_factor;
 pub mod users;
 
 use std::time::Duration;

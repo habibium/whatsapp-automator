@@ -148,6 +148,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/two-factor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Two-step verification status
+         * @description Whether signing in asks for a code from an authenticator app, and how many recovery codes are
+         *     left.
+         */
+        get: operations["get_two_factor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/two-factor/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start setting up two-step verification
+         * @description Checks the password, then creates a key for an authenticator app. Signing in does not ask for
+         *     codes until `POST /two-factor/enable` confirms the app shows the right one. Starting again
+         *     replaces a key that was never confirmed.
+         */
+        post: operations["setup_two_factor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/verify-email": {
         parameters: {
             query?: never;
@@ -220,6 +263,10 @@ export interface components {
             /** @description Lets a deploy tell when the new release is the one answering */
             version: string;
         };
+        /** @description The account password, asked again before a change to two-step verification */
+        PasswordConfirmation: {
+            password: string;
+        };
         PasswordReset: {
             password: string;
             /** @description The token from the reset email's link */
@@ -231,6 +278,23 @@ export interface components {
         SignInCredentials: {
             email: string;
             password: string;
+        };
+        /** @description What an authenticator app needs to start showing codes for the account */
+        TwoFactorSetup: {
+            /** @description Adds the account to an app that opens `otpauth://` links */
+            otpauth_url: string;
+            /** @description `otpauth_url` as a QR code: an SVG image in a `data:` URL */
+            qr_code: string;
+            /** @description The key in base32, for typing into an app by hand */
+            secret: string;
+        };
+        TwoFactorStatus: {
+            enabled: boolean;
+            /**
+             * Format: int64
+             * @description Unused recovery codes; 0 while two-step verification is off
+             */
+            recovery_codes_remaining: number;
         };
         UserResponse: {
             /** Format: date-time */
@@ -508,6 +572,98 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_two_factor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorStatus"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    setup_two_factor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordConfirmation"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorSetup"];
+                };
+            };
+            /** @description The password is incorrect */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Two-step verification is already on */
             409: {
                 headers: {
                     [name: string]: unknown;
