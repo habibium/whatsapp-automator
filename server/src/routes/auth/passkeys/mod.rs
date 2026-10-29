@@ -7,6 +7,8 @@ mod handlers;
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
+        .routes(routes!(handlers::list))
+        .routes(routes!(handlers::remove))
         .routes(routes!(handlers::start_registration))
         .routes(routes!(handlers::finish_registration))
 }

@@ -30,6 +30,17 @@ pub async fn insert(
     .await
 }
 
+pub async fn list(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<Vec<SavedPasskey>> {
+    sqlx::query_as!(
+        SavedPasskey,
+        "SELECT id, name, created_at, last_used_at FROM passkeys WHERE user_id = $1 \
+         ORDER BY created_at, id",
+        user_id
+    )
+    .fetch_all(db)
+    .await
+}
+
 pub async fn credential_ids(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Result<Vec<Vec<u8>>> {
     sqlx::query_scalar!(
         "SELECT credential_id FROM passkeys WHERE user_id = $1",
@@ -37,4 +48,17 @@ pub async fn credential_ids(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Res
     )
     .fetch_all(db)
     .await
+}
+
+/// Deletes the passkey only when it belongs to `user_id`; `false` when no such passkey does
+pub async fn delete(db: impl PgExecutor<'_>, id: Uuid, user_id: Uuid) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "DELETE FROM passkeys WHERE id = $1 AND user_id = $2",
+        id,
+        user_id
+    )
+    .execute(db)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
 }

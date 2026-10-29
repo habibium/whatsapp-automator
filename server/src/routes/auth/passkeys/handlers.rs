@@ -1,6 +1,12 @@
 use anyhow::Context;
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::{Path, State, rejection::PathRejection},
+    http::{HeaderValue, StatusCode, header},
+    response::IntoResponse,
+};
 use axum_extra::extract::cookie::CookieJar;
+use uuid::Uuid;
 use webauthn_rs::prelude::{CredentialID, PasskeyRegistration};
 use webauthn_rs_proto::ResidentKeyRequirement;
 
@@ -22,6 +28,29 @@ use crate::{
 const DEFAULT_NAME: &str = "Passkey";
 /// More than anyone keeps for one account; the cap stops a single account from filling the table
 const MAX_PASSKEYS: usize = 20;
+
+/// List passkeys
+///
+/// The signed-in user's passkeys, oldest first.
+#[utoipa::path(get, path = "/passkeys", responses(
+    (status = OK, body = [PasskeyResponse]),
+    (status = UNAUTHORIZED, body = ErrorBody),
+    (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
+))]
+pub async fn list(
+    State(state): State<AppState>,
+    session: Session,
+) -> Result<impl IntoResponse, AppError> {
+    let passkeys: Vec<PasskeyResponse> = db::passkeys::list(&state.pool, session.user.id)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
+    // Personal data, so no shared cache may keep it and hand it to someone else
+    let no_store = [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))];
+
+    Ok((no_store, Json(passkeys)))
+}
 
 /// Start adding a passkey
 ///
@@ -132,4 +161,38 @@ pub async fn finish_registration(
         cookie::PASSKEY_CEREMONY.clear(jar, secure),
         Json(saved.into()),
     ))
+}
+
+/// Remove a passkey
+///
+/// Checks the password again, deletes one of the signed-in user's passkeys and emails the owner.
+/// Answers 404 for a passkey that is not theirs.
+#[utoipa::path(delete, path = "/passkeys/{id}", params(("id" = Uuid, Path)), request_body = ConfirmPasskeyChange, responses(
+    (status = NO_CONTENT),
+    (status = BAD_REQUEST, description = "Wrong password", body = ErrorBody),
+    (status = UNAUTHORIZED, body = ErrorBody),
+    (status = NOT_FOUND, body = ErrorBody),
+    (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
+))]
+pub async fn remove(
+    State(state): State<AppState>,
+    session: Session,
+    id: Result<Path<Uuid>, PathRejection>,
+    ValidatedJson(payload): ValidatedJson<ConfirmPasskeyChange>,
+) -> Result<StatusCode, AppError> {
+    // A malformed id names no passkey, same as someone else's
+    let Ok(Path(id)) = id else {
+        return Err(AppError::NotFound);
+    };
+    let user = session.user;
+    reauth::confirm_password(&state.pool, user.id, payload.password).await?;
+
+    if !db::passkeys::delete(&state.pool, id, user.id).await? {
+        return Err(AppError::NotFound);
+    }
+
+    let alert = templates::security_alert(SecurityEvent::PasskeyRemoved, &state.app_url)?;
+    state.mailer.send_in_background(user.email, alert);
+
+    Ok(StatusCode::NO_CONTENT)
 }
