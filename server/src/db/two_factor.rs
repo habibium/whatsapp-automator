@@ -205,6 +205,14 @@ pub async fn delete_challenges_for_user(
     Ok(())
 }
 
+pub async fn delete_expired_challenges(db: impl PgExecutor<'_>) -> sqlx::Result<u64> {
+    let result = sqlx::query!("DELETE FROM two_factor_challenges WHERE expires_at <= now()")
+        .execute(db)
+        .await?;
+
+    Ok(result.rows_affected())
+}
+
 pub async fn delete_challenge(db: impl PgExecutor<'_>, token_hash: &[u8]) -> sqlx::Result<()> {
     sqlx::query!(
         "DELETE FROM two_factor_challenges WHERE token_hash = $1",
