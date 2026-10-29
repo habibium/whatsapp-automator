@@ -566,6 +566,45 @@ async fn a_recovery_code_signs_in_once(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn a_recovery_code_sign_in_emails_the_owner(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let enrolled = app.enroll(EMAIL).await;
+    let subjects = || -> Vec<_> {
+        app.emails_to(EMAIL)
+            .into_iter()
+            .map(|(subject, _)| subject)
+            .collect()
+    };
+
+    // An app code takes the phone as well, so it signs in without an email
+    let with_app = app
+        .second_factor(
+            json!({ "code": code(&enrolled.totp, enrolled.step + 1) }),
+            &app.challenge(EMAIL).await,
+        )
+        .await;
+    assert_eq!(with_app.status, StatusCode::OK);
+    assert_eq!(subjects(), ["Two-step verification is on"]);
+
+    let with_recovery_code = app
+        .second_factor(
+            json!({ "recovery_code": enrolled.recovery_codes[0] }),
+            &app.challenge(EMAIL).await,
+        )
+        .await;
+    assert_eq!(with_recovery_code.status, StatusCode::OK);
+    assert_eq!(
+        subjects(),
+        [
+            "Two-step verification is on",
+            "A recovery code was used to sign in"
+        ]
+    );
+    let (_, text) = app.emails_to(EMAIL).pop().unwrap();
+    assert!(text.contains("9 recovery codes are left."));
+}
+
+#[sqlx::test]
 async fn new_recovery_codes_and_turning_off_take_the_password(pool: PgPool) {
     let app = TestApp::new(pool);
     let enrolled = app.enroll(EMAIL).await;
