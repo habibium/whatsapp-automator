@@ -1,5 +1,6 @@
 mod auth;
 pub mod config;
+pub mod crypto;
 mod csrf;
 mod db;
 pub mod email;
