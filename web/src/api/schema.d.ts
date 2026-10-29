@@ -279,6 +279,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Too many writes from this client */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -310,6 +321,17 @@ export interface operations {
             };
             400: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many writes from this client */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
                     [name: string]: unknown;
                 };
                 content: {
@@ -350,6 +372,17 @@ export interface operations {
             /** @description Invalid password, or the link is malformed, expired or already used */
             400: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many writes from this client */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
                     [name: string]: unknown;
                 };
                 content: {
@@ -442,6 +475,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Too many attempts from this client or at this account */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -466,6 +510,17 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Too many writes from this client */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
             };
             500: {
                 headers: {
@@ -516,6 +571,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Too many writes from this client */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -552,6 +618,17 @@ export interface operations {
             /** @description The link is malformed, expired or already used */
             400: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many writes from this client */
+            429: {
+                headers: {
+                    /** @description Seconds until another attempt is allowed */
+                    "retry-after"?: number;
                     [name: string]: unknown;
                 };
                 content: {

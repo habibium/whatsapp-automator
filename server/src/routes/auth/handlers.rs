@@ -35,6 +35,7 @@ use crate::{
     (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "Marks this browser, so the verification link signs it in"))),
     (status = BAD_REQUEST, body = ErrorBody),
     (status = CONFLICT, body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn signup(
@@ -79,6 +80,7 @@ pub async fn signup(
     (status = BAD_REQUEST, body = ErrorBody),
     (status = UNAUTHORIZED, description = "Unknown email or wrong password", body = ErrorBody),
     (status = FORBIDDEN, description = "The address is not verified yet", body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many attempts from this client or at this account", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn signin(
@@ -119,6 +121,7 @@ pub async fn signin(
 /// Ends the current session and clears its cookie. Answers 204 even when nobody was signed in.
 #[utoipa::path(post, path = "/signout", responses(
     (status = NO_CONTENT),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn signout(
@@ -167,6 +170,7 @@ pub async fn get_session(
 #[utoipa::path(post, path = "/verify-email", request_body = EmailToken, responses(
     (status = OK, body = EmailVerified, headers(("set-cookie" = String, description = "The session cookie, for the browser that signed up"))),
     (status = BAD_REQUEST, description = "The link is malformed, expired or already used", body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn verify_email(
@@ -205,6 +209,7 @@ pub async fn verify_email(
 #[utoipa::path(post, path = "/resend-verification", request_body = EmailAddress, responses(
     (status = ACCEPTED),
     (status = BAD_REQUEST, body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn resend_verification(
@@ -226,6 +231,7 @@ pub async fn resend_verification(
 #[utoipa::path(post, path = "/forgot-password", request_body = EmailAddress, responses(
     (status = ACCEPTED),
     (status = BAD_REQUEST, body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn forgot_password(
@@ -246,6 +252,7 @@ pub async fn forgot_password(
 #[utoipa::path(post, path = "/reset-password", request_body = PasswordReset, responses(
     (status = OK, body = UserResponse),
     (status = BAD_REQUEST, description = "Invalid password, or the link is malformed, expired or already used", body = ErrorBody),
+    (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
 pub async fn reset_password(
