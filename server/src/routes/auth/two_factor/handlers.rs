@@ -144,7 +144,9 @@ pub async fn enable_two_factor(
         ));
     };
 
-    db::two_factor::enable(&mut *tx, user.id, step).await?;
+    if !db::two_factor::enable(&mut *tx, user.id, &sealed, step).await? {
+        return Err(AppError::Conflict("Start the setup first"));
+    }
     let recovery_codes = replace_recovery_codes(&mut tx, user.id).await?;
     db::sessions::delete_for_user(&mut *tx, user.id).await?;
     let jar = session::start(&mut *tx, jar, user.id, state.secure_cookies()).await?;

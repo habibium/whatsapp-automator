@@ -117,17 +117,25 @@ pub async fn delete_pending(db: impl PgExecutor<'_>, user_id: Uuid) -> sqlx::Res
     Ok(())
 }
 
-/// `step` is the confirming code's, so that code cannot sign in afterwards
-pub async fn enable(db: impl PgExecutor<'_>, user_id: Uuid, step: i64) -> sqlx::Result<()> {
-    sqlx::query!(
-        "UPDATE totp_secrets SET enabled_at = now(), last_used_step = $2 WHERE user_id = $1",
+/// Turns on the pending key if it is still `sealed_secret`, the one the confirming code was checked
+/// against, and returns whether it did. `step` is that code's, so it cannot sign in afterwards.
+pub async fn enable(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    sealed_secret: &[u8],
+    step: i64,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE totp_secrets SET enabled_at = now(), last_used_step = $3 \
+         WHERE user_id = $1 AND secret = $2 AND enabled_at IS NULL",
         user_id,
+        sealed_secret,
         step
     )
     .execute(db)
     .await?;
 
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }
 
 /// Records the step of a code that just worked. Returns `false` when that step, or a later one,
