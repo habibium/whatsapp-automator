@@ -18,6 +18,7 @@ use governor::{
 use tower_governor::{
     GovernorError, GovernorLayer, governor::GovernorConfigBuilder, key_extractor::KeyExtractor,
 };
+use uuid::Uuid;
 
 use crate::error::AppError;
 
@@ -110,6 +111,7 @@ fn key(ip: IpAddr) -> IpAddr {
 #[derive(Clone)]
 pub struct RateLimits {
     signin: Arc<DefaultKeyedRateLimiter<String>>,
+    reauth: Arc<DefaultKeyedRateLimiter<Uuid>>,
 }
 
 impl Default for RateLimits {
@@ -120,8 +122,10 @@ impl Default for RateLimits {
             .allow_burst(ACCOUNT_BURST);
         let limits = Self {
             signin: Arc::new(RateLimiter::keyed(quota)),
+            reauth: Arc::new(RateLimiter::keyed(quota)),
         };
         sweep(&limits.signin);
+        sweep(&limits.reauth);
 
         limits
     }
@@ -131,6 +135,11 @@ impl RateLimits {
     /// Counts a sign-in attempt for `email`, already normalized
     pub(crate) fn signin(&self, email: &str) -> Result<(), AppError> {
         check(&self.signin, &email.to_owned())
+    }
+
+    /// Counts a password re-check by the signed-in `user_id`
+    pub(crate) fn reauth(&self, user_id: Uuid) -> Result<(), AppError> {
+        check(&self.reauth, &user_id)
     }
 }
 
