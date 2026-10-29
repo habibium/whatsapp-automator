@@ -33,7 +33,7 @@ use crate::{
 /// address is verified.
 #[utoipa::path(post, path = "/signup", request_body = Credentials, responses(
     (status = OK, body = UserResponse, headers(("set-cookie" = String, description = "Marks this browser, so the verification link signs it in"))),
-    (status = BAD_REQUEST, body = ErrorBody),
+    (status = BAD_REQUEST, description = "Invalid email, or an invalid or breached password", body = ErrorBody),
     (status = CONFLICT, body = ErrorBody),
     (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
@@ -255,7 +255,7 @@ pub async fn forgot_password(
 /// emailed link of the account stops working, so the user signs in again everywhere.
 #[utoipa::path(post, path = "/reset-password", request_body = PasswordReset, responses(
     (status = OK, body = UserResponse),
-    (status = BAD_REQUEST, description = "Invalid password, or the link is malformed, expired or already used", body = ErrorBody),
+    (status = BAD_REQUEST, description = "Invalid or breached password, or the link is malformed, expired or already used", body = ErrorBody),
     (status = TOO_MANY_REQUESTS, description = "Too many writes from this client", body = ErrorBody, headers(("retry-after" = u64, description = "Seconds until another attempt is allowed"))),
     (status = INTERNAL_SERVER_ERROR, body = ErrorBody),
 ))]
@@ -263,6 +263,11 @@ pub async fn reset_password(
     State(state): State<AppState>,
     ValidatedJson(payload): ValidatedJson<PasswordReset>,
 ) -> Result<Json<UserResponse>, AppError> {
+    // Ahead of the transaction, so no connection or token lock waits on HIBP
+    state
+        .pwned_passwords
+        .reject_breached("password", &payload.password)
+        .await?;
     let mut tx = state.pool.begin().await?;
     let user_id = consume_token(&mut tx, &payload.token, Purpose::ResetPassword).await?;
     // Hashing is the expensive step, so it waits until the token checks out

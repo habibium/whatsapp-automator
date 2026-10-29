@@ -160,7 +160,7 @@
             }
           },
           "400": {
-            "description": "Invalid password, or the link is malformed, expired or already used",
+            "description": "Invalid or breached password, or the link is malformed, expired or already used",
             "content": {
               "application/json": {
                 "schema": {
@@ -405,7 +405,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Invalid email, or an invalid or breached password",
             "content": {
               "application/json": {
                 "schema": {

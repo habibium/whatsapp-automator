@@ -369,7 +369,7 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
-            /** @description Invalid password, or the link is malformed, expired or already used */
+            /** @description Invalid or breached password, or the link is malformed, expired or already used */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -555,6 +555,7 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
+            /** @description Invalid email, or an invalid or breached password */
             400: {
                 headers: {
                     [name: string]: unknown;
