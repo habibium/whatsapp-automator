@@ -9,12 +9,17 @@ import { Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { z } from 'zod'
 
-import { $api } from '@/api/client'
+import { api } from '@/api/client'
 import { AuthLayout } from '@/components/auth-layout'
 import { EmailField } from '@/components/email-field'
 import { PasswordField } from '@/components/password-field'
 import { ResendVerification } from '@/components/resend-verification'
 import { toFieldErrors, toStatusMessage } from '@/lib/form-errors'
+import {
+  TOO_MANY_ATTEMPTS,
+  retryAfterSeconds,
+  tryAgainIn,
+} from '@/lib/retry-after'
 import { HOME_HREF, SIGNIN_HREF, currentUser } from '@/lib/session'
 
 export const Route = createFileRoute('/signup')({
@@ -38,9 +43,14 @@ const signupSchema = z.object({
 
 const fieldNames = ['email', 'password'] as const
 
+type Problem =
+  | { kind: 'rate-limited'; retryAfter?: number }
+  /** `message` is the server's, such as "Email already registered" */
+  | { kind: 'failed'; message?: string }
+
 function Signup() {
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
-  const signup = $api.useMutation('post', '/api/auth/signup')
+  const [problem, setProblem] = useState<Problem | null>(null)
 
   const form = useForm({
     defaultValues: { email: '', password: '' },
@@ -48,18 +58,31 @@ function Signup() {
     // Otherwise handleSubmit silently no-ops on an invalid form instead of surfacing the errors.
     canSubmitWhenInvalid: true,
     listeners: {
-      onChange: () => {
-        if (signup.isError) signup.reset()
-      },
+      onChange: () => setProblem(null),
     },
     onSubmit: async ({ value, formApi }) => {
       const email = value.email.trim()
       try {
-        await signup.mutateAsync({ body: { email, password: value.password } })
-        setRegisteredEmail(email)
-      } catch (error) {
+        const { data, error, response } = await api.POST('/api/auth/signup', {
+          body: { email, password: value.password },
+        })
+        if (data) {
+          setRegisteredEmail(email)
+          return
+        }
         const fields = toFieldErrors(error, fieldNames)
-        if (fields) formApi.setErrorMap({ onSubmit: { fields } })
+        if (fields) {
+          formApi.setErrorMap({ onSubmit: { fields } })
+        } else if (response.status === 429) {
+          setProblem({
+            kind: 'rate-limited',
+            retryAfter: retryAfterSeconds(response),
+          })
+        } else {
+          setProblem({ kind: 'failed', message: error?.error })
+        }
+      } catch {
+        setProblem({ kind: 'failed' })
       }
     },
   })
@@ -117,10 +140,16 @@ function Signup() {
         }}
       >
         <VStack gap={6}>
-          {signup.isError && !signup.error.details ? (
+          {problem?.kind === 'rate-limited' ? (
             <Banner
               status="error"
-              title={signup.error.error || 'Unable to create your account'}
+              title={TOO_MANY_ATTEMPTS}
+              description={tryAgainIn(problem.retryAfter)}
+            />
+          ) : problem ? (
+            <Banner
+              status="error"
+              title={problem.message || 'Unable to create your account'}
             />
           ) : null}
 
