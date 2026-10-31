@@ -1,5 +1,109 @@
 # Changelog
 
+## [0.1.0-alpha.6] - 2026-10-31
+
+### Features
+
+- **server:** Add password re-check and security alert emails (339c56f)
+- **web:** Add security settings page and password confirmation dialog (905fea3)
+- **server:** Rate-limit auth writes per client IP (a85167e)
+- **server:** Key the IP rate limit on CLIENT_IP_HEADER when set (1eb84d7)
+- **server:** Sweep refilled keys out of the IP rate limiter (d810fbc)
+- **server:** Limit sign-in attempts per account (9037a1d)
+- **server:** Limit password re-checks per user (781e9c6)
+- **server:** Reject breached passwords at sign-up (0c18679)
+- **server:** Reject breached passwords on reset (c6eeb3e)
+- **web:** Add a helper that reads Retry-After (bbef4d5)
+- **web:** Say when sign-in is rate-limited (cc7af11)
+- **web:** Say when sign-up is rate-limited (320f47f)
+- **web:** Say when an emailed-link request is rate-limited (abb2cc2)
+- **web:** Say when a password reset is rate-limited (957c97e)
+- **web:** Say when resending the verification link is rate-limited (05f7c9c)
+- **web:** Say when email verification is rate-limited (0f6a4cd)
+- **web:** Say when a password re-check is rate-limited (9968f07)
+- **server:** Add passkey and passkey ceremony tables (1eeaf15)
+- **server:** Add passkey registration (2828769)
+- **server:** List and remove passkeys (aec5902)
+- **server:** Sign in with a passkey (35c2cfa)
+- **web:** Add passkey WebAuthn helpers (569047b)
+- **web:** Sign in with a passkey (c4ff145)
+- **web:** Manage passkeys in security settings (9bcbcfd)
+- **server:** Add an AEAD cipher for secrets at rest (26695a1)
+- **server:** Read ENCRYPTION_KEY into the app state (226ee15)
+- **server:** Add tables for two-step verification (7af34b7)
+- **server:** Start two-step verification setup (3caecc5)
+- **server:** Turn two-step verification on with a first code (a3ac03c)
+- **server:** Turn two-step verification off (ed734f6)
+- **server:** Replace recovery codes on request (58079b7)
+- **server:** Finish a sign-in with a second factor (c8715d3)
+- **server:** End pending second-factor sign-ins on password reset (a617dcb)
+- **server:** End pending second-factor sign-ins when it is turned off (71327b4)
+- **server:** Sweep expired second-factor challenges hourly (f60294b)
+- **web:** Add an authenticator code field (269eb0e)
+- **web:** Add the second step of signing in (ced3c3e)
+- Ask for the second factor at sign-in (bf0ef72)
+- **web:** Show new recovery codes once, with copy and download (73e9d2c)
+- **web:** Add the authenticator app setup dialog (7eb7f2e)
+- **web:** Add the two-step verification settings section (c8f1185)
+- **web:** Put two-step verification on the security page (b701e81)
+- **web:** Say when a code or passkey sign-in is rate-limited (1e75cde)
+
+### Bug Fixes
+
+- **server:** Limit second-factor codes per account across sign-ins (69efbcd)
+- **server:** Email the owner when a sign-in runs out of codes (b0b4e48)
+- **server:** Expire pending two-step setups after 15 minutes (b7d2b00)
+- **server:** Sweep expired two-step setups hourly (689809a)
+- **server:** Delete a pending two-step setup after five wrong codes (30b2d1e)
+- **server:** Count enable codes toward the per-account code limit (67c1dad)
+- **server:** Take the account lock while saving a pending two-step key (ba8a1cd)
+- **server:** Turn on only the key the confirming code was checked against (eaa83cb)
+- **server:** Give each security alert a remedy that works for it (7cbb58e)
+- **server:** Link the new-passkey alert to the security settings (564b2ff)
+- **server:** Email the owner after a recovery-code sign-in (1ef56d7)
+- **web:** Say when turning on two-step verification is rate-limited (24b2fc4)
+- **web:** Explain an ended two-step setup and offer to start again (f6bc3d5)
+- **server:** Cap wrong second-factor codes per account, not every code (1982ac1)
+
+### Documentation
+
+- **server:** Document the 429 on auth writes in OpenAPI (a51c73f)
+- Document rate limits, CLIENT_IP_HEADER and the breached-password check (78593f5)
+- Document passkeys (1b8e3bf)
+- Document ENCRYPTION_KEY (1e24d2d)
+- Document two-step verification (0dfbf12)
+- Document the second-factor code limits and alerts (e435b88)
+- Describe the daily cap on wrong second-factor codes (c46502a)
+
+### Maintenance
+
+- **server:** Cover the per-IP limit on auth writes (3d72728)
+- **server:** Cover the per-account sign-in limit (353c307)
+- **server:** Cover breached passwords at sign-up and reset (5aa7d90)
+- **server:** Drive passkey ceremonies with a software authenticator (bb24f0e)
+- **server:** Cover two-step verification end to end (49ab4c5)
+- **web:** Drop a doc comment that restates the component name (06d4dff)
+- **server:** Keep sent emails for tests to read (676f2e2)
+- **server:** Limit second-factor codes per account across sign-ins (37c7995)
+- **server:** Alert the owner once when a sign-in runs out of codes (45a5a8a)
+- **server:** Expire a pending two-step setup after 15 minutes (53b145b)
+- **server:** End a pending two-step setup after five wrong codes (ce403a8)
+- **server:** Refuse to turn on a key that replaced the checked one (980c2e2)
+- **server:** Render every security alert with its own remedy (f8bba87)
+- **server:** Email the owner after a recovery-code sign-in only (c8486d6)
+- **server:** Cap only wrong second-factor codes (fd74f46)
+
+### Other
+
+- Merge passkeys into rewrite
+
+Passkey re-checks go through the rate-limited confirm_password, which
+now takes the app state. (1ede79b)
+- Merge two-step verification into rewrite
+
+Sign-in keeps the per-account rate limit ahead of the lookup and now
+answers with the two-factor union. Settings show two-step verification
+above passkeys, and the session-holding test helper lives on TestApp. (af922f7)
 ## [0.1.0-alpha.5] - 2026-10-29
 
 ### Features
